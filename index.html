@@ -32,7 +32,7 @@
         const { useState, useEffect, useMemo } = React;
 
         const gtoData = [
-            // МУЖЧИНЫ 10 СТУПЕНЬ
+            // МУЖЧИНЫ 10 СТУПЕНЬ - ОБЯЗАТЕЛЬНЫЕ
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 5 км', unit: 'мин:с', gold: '22:30', silver: '26:00', bronze: '28:30' },
@@ -43,6 +43,15 @@
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 33, silver: 19, bronze: 15 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Рывок гири 16 кг', unit: 'раз', gold: 40, silver: 22, bronze: 18 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 23, silver: 15, bronze: 10 },
+
+            // МУЖЧИНЫ 10 СТУПЕНЬ - ПО ВЫБОРУ
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Прыжок в длину с места', unit: 'см', gold: 234, silver: 213, bronze: 197 },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Поднимание туловища за 1 мин', unit: 'раз', gold: 42, silver: 32, bronze: 25 },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Метание спортивного снаряда 700 г', unit: 'м', gold: 35, silver: 30, bronze: 26 },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Плавание на 50 м', unit: 'мин:с', gold: '0:55', silver: '1:05', bronze: '1:22' },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (открытый прицел)', unit: 'очки', gold: 25, silver: 20, bronze: 15 },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (электронное оружие)', unit: 'очки', gold: 30, silver: 25, bronze: 18 },
+            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Туристский поход', unit: 'навыков', gold: 7, silver: 5, bronze: 3 },
 
             // ЖЕНЩИНЫ 9 СТУПЕНЬ
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
@@ -165,7 +174,6 @@
                 }).filter(d => d.result !== null);
             }, [currentData, inputs]);
 
-            // НОВАЯ ЛОГИКА: Оставляем только ЛУЧШИЙ результат в каждой категории
             const bestResultsByCategory = useMemo(() => {
                 const best = {};
                 results.forEach(r => {
@@ -177,7 +185,6 @@
                 return Object.values(best);
             }, [results]);
 
-            // Отставания теперь считаются только по лучшим дисциплинам
             const deficits = bestResultsByCategory.filter(r => r.result.badge !== 'gold');
 
             const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
@@ -188,40 +195,55 @@
             };
 
             const renderCalculator = () => {
-                const categories = [...new Set(currentData.map(d => d.category))];
+                // Разделяем категории по типам
+                const types = ['Обязательное', 'По выбору'];
+
                 return (
-                    <div className="px-4 space-y-6">
-                        {categories.map(cat => (
-                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4">{cat}</h3>
-                                <div className="space-y-4">
-                                    {currentData.filter(d => d.category === cat).map(d => (
-                                        <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                                            <div className="w-1/2 pr-2">
-                                                <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
+                    <div className="px-4 space-y-8">
+                        {types.map(type => {
+                            const typeData = currentData.filter(d => d.type === type);
+                            if (typeData.length === 0) return null; // Если для этого пола/ступени нет таких испытаний, пропускаем
+                            
+                            const categories = [...new Set(typeData.map(d => d.category))];
+                            
+                            return (
+                                <div key={type} className="space-y-4">
+                                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">
+                                        {type === 'Обязательное' ? 'Обязательные испытания' : 'Испытания по выбору'}
+                                    </h2>
+                                    
+                                    {categories.map(cat => (
+                                        <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm">
+                                            <h3 className="text-lg font-bold text-slate-800 mb-4">{cat}</h3>
+                                            <div className="space-y-4">
+                                                {typeData.filter(d => d.category === cat).map(d => (
+                                                    <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                                                        <div className="w-1/2 pr-2">
+                                                            <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
+                                                        </div>
+                                                        <div className="w-1/2 relative flex items-center justify-end">
+                                                            <input 
+                                                                type="text" 
+                                                                inputMode="decimal"
+                                                                value={inputs[d.name] || ''}
+                                                                onChange={(e) => handleInput(d.name, e.target.value)}
+                                                                placeholder="0"
+                                                                className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-16 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                                                            />
+                                                            <span className="absolute right-3 text-[10px] font-bold text-slate-400 uppercase tracking-wide pointer-events-none select-none">
+                                                                {d.unit}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            
-                                            <div className="w-1/2 relative flex items-center justify-end">
-                                                <input 
-                                                    type="text" 
-                                                    inputMode="decimal"
-                                                    value={inputs[d.name] || ''}
-                                                    onChange={(e) => handleInput(d.name, e.target.value)}
-                                                    placeholder="0"
-                                                    className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-12 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-                                                />
-                                                <span className="absolute right-3 text-[10px] font-bold text-slate-400 uppercase tracking-wide pointer-events-none select-none">
-                                                    {d.unit}
-                                                </span>
-                                            </div>
-                                            
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 pt-4">
                             <button 
                                 onClick={() => setView('dashboard')}
                                 className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
@@ -249,7 +271,6 @@
                     );
                 }
 
-                // НОВАЯ ЛОГИКА СТАТУСА: смотрим только на лучшие результаты в категориях
                 let overall = 'gold';
                 if (bestResultsByCategory.some(r => r.result.badge === 'none')) overall = 'none';
                 else if (bestResultsByCategory.some(r => r.result.badge === 'bronze')) overall = 'bronze';
@@ -311,7 +332,9 @@
                     'Скоростные возможности': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
                     'Выносливость': { title: 'Равномерный бег', text: 'Длительный кросс 2-3 раза в неделю (30-40 мин) на низком пульсе, чтобы можно было спокойно разговаривать.' },
                     'Сила': { title: 'Работа "в отказ"', text: '3-4 подхода на максимум повторений (3 раза в неделю). Обязательно отдыхайте 1-2 дня между тренировками.' },
-                    'Гибкость': { title: 'Статическая растяжка', text: 'Наклоны с удержанием в нижней точке на 20-30 секунд. Выполняйте на разогретые мышцы без рывков.' }
+                    'Гибкость': { title: 'Статическая растяжка', text: 'Наклоны с удержанием в нижней точке на 20-30 секунд. Выполняйте на разогретые мышцы без рывков.' },
+                    'Скоростно-силовые возможности': { title: 'Взрывная сила', text: 'Тренируйте прыжки на тумбу и регулярно выполняйте упражнения на пресс (скручивания, планка).' },
+                    'Прикладные навыки': { title: 'Специфическая подготовка', text: 'Выберите вашу самую сильную дисциплину (плавание, стрельба или метание) и уделите основное внимание отработке техники.' }
                 };
 
                 return (
