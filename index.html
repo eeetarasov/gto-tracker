@@ -175,19 +175,25 @@
                                 <div className="space-y-4">
                                     {currentData.filter(d => d.category === cat).map(d => (
                                         <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                                            <div className="w-2/3 pr-2">
+                                            <div className="w-1/2 pr-2">
                                                 <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
                                             </div>
-                                            <div className="w-1/3 relative">
+                                            
+                                            {/* ОБНОВЛЕННЫЙ БЛОК ПОЛЯ ВВОДА С ЕДИНИЦЕЙ ИЗМЕРЕНИЯ */}
+                                            <div className="w-1/2 relative flex items-center justify-end">
                                                 <input 
                                                     type="text" 
                                                     inputMode="decimal"
                                                     value={inputs[d.name] || ''}
                                                     onChange={(e) => handleInput(d.name, e.target.value)}
                                                     placeholder="0"
-                                                    className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                                                    className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-12 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
                                                 />
+                                                <span className="absolute right-3 text-[10px] font-bold text-slate-400 uppercase tracking-wide pointer-events-none select-none">
+                                                    {d.unit}
+                                                </span>
                                             </div>
+                                            
                                         </div>
                                     ))}
                                 </div>
@@ -307,7 +313,6 @@
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
                             
-                            {/* БЛОК С ЛОГОТИПОМ ГТО (БЕЗ ФОНА) */}
                             <div className="flex items-center gap-3 mb-4">
                                 <img 
                                     src="logo.png?v=2" 
