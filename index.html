@@ -63,7 +63,6 @@
             return `${Math.round(gap * 10) / 10} ${unit}`;
         };
 
-        // НОВАЯ ЛОГИКА СРАВНЕНИЯ ПО СТУПЕНЯМ
         const calculateResult = (discipline, inputValue) => {
             if (!inputValue) return null;
             const val = parseTime(inputValue);
@@ -126,6 +125,15 @@
                 }
             };
 
+            const handleClear = () => {
+                if (window.confirm('Точно очистить все введенные результаты?')) {
+                    setInputs({});
+                    if (userId) {
+                        localStorage.removeItem(`gto_${userId}_${gender}`);
+                    }
+                }
+            };
+
             const currentData = useMemo(() => gtoData.filter(d => d.gender === gender), [gender]);
             
             const results = useMemo(() => {
@@ -172,12 +180,22 @@
                                 </div>
                             </div>
                         ))}
-                        <button 
-                            onClick={() => setView('dashboard')}
-                            className="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-full shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
-                        >
-                            РАССЧИТАТЬ
-                        </button>
+                        
+                        {/* Блок с двумя кнопками */}
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setView('dashboard')}
+                                className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
+                            >
+                                РАССЧИТАТЬ
+                            </button>
+                            <button 
+                                onClick={handleClear}
+                                className="w-1/3 bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center"
+                            >
+                                ОЧИСТИТЬ
+                            </button>
+                        </div>
                     </div>
                 );
             };
@@ -249,7 +267,6 @@
 
                 const weakCategories = [...new Set(deficits.map(d => d.category))];
                 
-                // СТРУКТУРИРОВАННЫЕ КАРТОЧКИ СОВЕТОВ
                 const adviceMap = {
                     'Скорость': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
                     'Выносливость': { title: 'Равномерный бег', text: 'Длительный кросс 2-3 раза в неделю (30-40 мин) на низком пульсе, чтобы можно было спокойно разговаривать.' },
@@ -320,5 +337,4 @@
     </script>
 </body>
 </html>
-
 
