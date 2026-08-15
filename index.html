@@ -31,7 +31,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ПОЛНАЯ БАЗА ДАННЫХ СО ВСЕМИ УПРАЖНЕНИЯМИ ИЗ СКРИНШОТОВ
         const gtoData = [
             // МУЖЧИНЫ 10 СТУПЕНЬ
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
@@ -308,16 +307,14 @@
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
                             
-                            {/* БЛОК С ЛОГОТИПОМ ГТО ИЗ ЛОКАЛЬНОГО ФАЙЛА */}
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="bg-white p-2 rounded-xl shadow-md">
-                                    <img 
-                                        src="logo.png" 
-                                        alt="ГТО" 
-                                        className="h-10 w-auto object-contain"
-                                    />
-                                </div>
-                                <h1 className="text-xl font-black tracking-widest text-white drop-shadow-sm">PRO_TRACKER</h1>
+                            {/* БЛОК С ЛОГОТИПОМ ГТО (БЕЗ ФОНА) */}
+                            <div className="flex items-center gap-3 mb-4">
+                                <img 
+                                    src="logo.png" 
+                                    alt="ГТО" 
+                                    className="h-10 w-auto object-contain drop-shadow-sm"
+                                />
+                                <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-sm">PRO_TRACKER</h1>
                             </div>
                             
                             <p className="text-blue-200 font-medium text-sm">Привет, {userName}! Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</p>
