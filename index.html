@@ -195,14 +195,14 @@
             };
 
             const renderCalculator = () => {
-                // Разделяем категории по типам
                 const types = ['Обязательное', 'По выбору'];
 
                 return (
-                    <div className="px-4 space-y-8">
+                    // ДОБАВЛЕН ОТСТУП pt-6 ДЛЯ ИСПРАВЛЕНИЯ НАЕЗДА ТЕКСТА НА ШАПКУ
+                    <div className="px-4 space-y-8 pt-6"> 
                         {types.map(type => {
                             const typeData = currentData.filter(d => d.type === type);
-                            if (typeData.length === 0) return null; // Если для этого пола/ступени нет таких испытаний, пропускаем
+                            if (typeData.length === 0) return null;
                             
                             const categories = [...new Set(typeData.map(d => d.category))];
                             
