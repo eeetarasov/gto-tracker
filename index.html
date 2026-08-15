@@ -65,16 +65,11 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
-        // ИСПРАВЛЕННЫЙ БЛОК: Ключи теперь строго на русской кириллице (М_10 и Ж_9)
         const gtoQuotaData = {
           'М_10': {
-            'required_categories': 6,
-            'required_tests': 6,
             'gold': 6, 'silver': 5, 'bronze': 5 
           },
           'Ж_9': {
-            'required_categories': 6,
-            'required_tests': 6,
             'gold': 6, 'silver': 5, 'bronze': 5
           }
         };
@@ -282,17 +277,23 @@
                     );
                 }
 
-                // Логика расчета по квотам с исправленными ключами
                 const currentKey = `${gender}_${gender === 'М' ? 10 : 9}`;
                 const currentQuotas = gtoQuotaData[currentKey] || gtoQuotaData['М_10']; 
                 
-                const numTestsExecuted = results.length;
-                const numCategoriesExecuted = bestResultsByCategory.length;
+                // РАЗДЕЛЕНИЕ НА ОБЯЗАТЕЛЬНЫЕ И ПО ВЫБОРУ
+                const mandatoryCategories = [...new Set(currentData.filter(d => d.type === 'Обязательное').map(d => d.category))];
+                const reqMandatory = mandatoryCategories.length;
+                const reqOptionalGold = currentQuotas.gold - reqMandatory;
+                const reqOptionalSilver = currentQuotas.silver - reqMandatory;
+
+                const executedMandatoryCount = mandatoryCategories.filter(cat => bestResultsByCategory.some(r => r.category === cat)).length;
+                const executedOptionalCount = bestResultsByCategory.length - executedMandatoryCount;
 
                 let badgeByQuota = 'none';
-                if (numCategoriesExecuted >= currentQuotas.gold && numTestsExecuted >= currentQuotas.gold) badgeByQuota = 'gold';
-                else if (numCategoriesExecuted >= currentQuotas.silver && numTestsExecuted >= currentQuotas.silver) badgeByQuota = 'silver';
-                else if (numCategoriesExecuted >= currentQuotas.bronze && numTestsExecuted >= currentQuotas.bronze) badgeByQuota = 'bronze';
+                if (executedMandatoryCount >= reqMandatory) {
+                    if (executedOptionalCount >= reqOptionalGold) badgeByQuota = 'gold';
+                    else if (executedOptionalCount >= reqOptionalSilver) badgeByQuota = 'silver';
+                }
 
                 // Финальный статус: минимум между квотой и слабым звеном
                 const finalBadge = badgeValues[badgeByQuota] < badgeValues[worstExecutedBadge] ? badgeByQuota : worstExecutedBadge;
@@ -311,9 +312,10 @@
                         <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
                             <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
                             <p className="text-3xl font-black">{badgeNames[finalBadge]}</p>
-                            {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по тестам/категориям не выполнены</p>}
+                            {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по категориям не выполнены</p>}
                         </div>
 
+                        {/* ОБНОВЛЕННЫЙ БЛОК КВОТ С ЖЕСТКИМ РАЗДЕЛЕНИЕМ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                 <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -321,16 +323,21 @@
                             </h3>
                             <div className="space-y-4 text-sm">
                                 <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                                    <p className="text-slate-700 w-2/3 leading-tight">Физических качеств (категорий)</p>
-                                    <p className="text-right w-1/3 text-xl font-bold text-slate-900">
-                                      <span className={numCategoriesExecuted >= currentQuotas.bronze ? 'text-green-600' : 'text-red-600'}>{numCategoriesExecuted}</span> <span className="text-xs font-medium text-slate-400">из {currentQuotas.gold}</span>
-                                    </p>
+                                    <p className="text-slate-700 w-2/3 leading-tight">Обязательных качеств</p>
+                                    <div className="text-right w-1/3">
+                                        <p className="text-xl font-bold text-slate-900">
+                                            <span className={executedMandatoryCount >= reqMandatory ? 'text-green-600' : 'text-red-600'}>{executedMandatoryCount}</span> <span className="text-xs font-medium text-slate-400">из {reqMandatory}</span>
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="flex justify-between items-center pb-1">
-                                    <p className="text-slate-700 w-2/3 leading-tight">Всего тестов (испытаний)</p>
-                                    <p className="text-right w-1/3 text-xl font-bold text-slate-900">
-                                      <span className={numTestsExecuted >= currentQuotas.bronze ? 'text-green-600' : 'text-red-600'}>{numTestsExecuted}</span> <span className="text-xs font-medium text-slate-400">из {currentQuotas.gold}</span>
-                                    </p>
+                                    <p className="text-slate-700 w-2/3 leading-tight">Качеств по выбору</p>
+                                    <div className="text-right w-1/3">
+                                        <p className="text-xl font-bold text-slate-900">
+                                            <span className={executedOptionalCount >= reqOptionalSilver ? 'text-green-600' : 'text-red-600'}>{executedOptionalCount}</span> <span className="text-xs font-medium text-slate-400">из {reqOptionalGold}</span>
+                                        </p>
+                                        <p className="text-[9px] text-slate-400 mt-0.5 leading-none">мин. {reqOptionalSilver} для сер/бронз</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -339,7 +346,7 @@
                             <div className="bg-white p-5 rounded-3xl shadow-sm">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                     <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                    Ближайшие цели (по результатам тестов)
+                                    Ближайшие цели (по вашим тестам)
                                 </h3>
                                 <div className="space-y-4">
                                     {bestResultsByCategory.filter(r => r.result.badge !== 'gold').map(d => (
