@@ -65,6 +65,21 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
+        // ДАННЫЕ О КВОТАХ И МИНИМУМАХ (из скриншота image_17.png)
+        const gtoQuotaData = {
+          'M_10': { // Ступень 10 Мужчины
+            'required_categories': 6, // Физических качеств/категорий
+            'required_tests': 6, // Всего тестов
+            // Минимумы по категориям для каждого знака
+            'gold': 6, 'silver': 5, 'bronze': 5 
+          },
+          'F_9': { // Ступень 9 Женщины (для примера, используем другие значения)
+            'required_categories': 4,
+            'required_tests': 4,
+            'gold': 4, 'silver': 3, 'bronze': 3
+          }
+        };
+
         const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
 
         const parseTime = (val, unit) => {
@@ -174,6 +189,7 @@
                 }).filter(d => d.result !== null);
             }, [currentData, inputs]);
 
+            // Оставляем только лучший результат в каждой категории
             const bestResultsByCategory = useMemo(() => {
                 const best = {};
                 results.forEach(r => {
@@ -185,20 +201,18 @@
                 return Object.values(best);
             }, [results]);
 
-            const deficits = bestResultsByCategory.filter(r => r.result.badge !== 'gold');
-
-            const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
-            const badgeColorsMap = {
-                'gold': 'text-yellow-600',
-                'silver': 'text-slate-500',
-                'bronze': 'text-orange-600'
-            };
+            // Худший знак среди ЛУЧШИХ результатов категорий (правило слабого звена)
+            const worstExecutedBadge = useMemo(() => {
+                if (bestResultsByCategory.length === 0) return 'none';
+                const executedBadges = bestResultsByCategory.map(r => badgeValues[r.result.badge]);
+                const worstVal = Math.min(...executedBadges);
+                return Object.keys(badgeValues).find(key => badgeValues[key] === worstVal);
+            }, [bestResultsByCategory]);
 
             const renderCalculator = () => {
                 const types = ['Обязательное', 'По выбору'];
 
                 return (
-                    // ДОБАВЛЕН ОТСТУП pt-6 ДЛЯ ИСПРАВЛЕНИЯ НАЕЗДА ТЕКСТА НА ШАПКУ
                     <div className="px-4 space-y-8 pt-6"> 
                         {types.map(type => {
                             const typeData = currentData.filter(d => d.type === type);
@@ -271,10 +285,20 @@
                     );
                 }
 
-                let overall = 'gold';
-                if (bestResultsByCategory.some(r => r.result.badge === 'none')) overall = 'none';
-                else if (bestResultsByCategory.some(r => r.result.badge === 'bronze')) overall = 'bronze';
-                else if (bestResultsByCategory.some(r => r.result.badge === 'silver')) overall = 'silver';
+                // Логика расчета по квотам
+                const currentKey = `${gender}_${gender === 'М' ? 10 : 9}`;
+                const currentQuotas = gtoQuotaData[currentKey] || gtoQuotaData['F_9'];
+                
+                const numTestsExecuted = results.length;
+                const numCategoriesExecuted = bestResultsByCategory.length;
+
+                let badgeByQuota = 'none';
+                if (numCategoriesExecuted >= currentQuotas.gold && numTestsExecuted >= currentQuotas.gold) badgeByQuota = 'gold';
+                else if (numCategoriesExecuted >= currentQuotas.silver && numTestsExecuted >= currentQuotas.silver) badgeByQuota = 'silver';
+                else if (numCategoriesExecuted >= currentQuotas.bronze && numTestsExecuted >= currentQuotas.bronze) badgeByQuota = 'bronze';
+
+                // Финальный статус: минимум между квотой и слабым звеном
+                const finalBadge = badgeValues[badgeByQuota] < badgeValues[worstExecutedBadge] ? badgeByQuota : worstExecutedBadge;
 
                 const headerColors = {
                     'gold': 'bg-yellow-400 text-yellow-900',
@@ -283,25 +307,51 @@
                     'none': 'bg-red-100 text-red-600'
                 };
 
+                const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
+
                 return (
                     <div className="px-4 space-y-6">
-                        <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[overall]} flex flex-col items-center justify-center`}>
+                        <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
                             <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
-                            <p className="text-3xl font-black">{badgeNames[overall]}</p>
+                            <p className="text-3xl font-black">{badgeNames[finalBadge]}</p>
+                            {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по тестам/категориям не выполнены</    p>}
                         </div>
 
-                        {deficits.length > 0 ? (
+                        {/* НОВЫЙ БЛОК О ВЫПОЛНЕНИИ КВОТ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                Выполнение минимумов
+                            </h3>
+                            <div className="space-y-4 text-sm">
+                                <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                                    <p className="text-slate-700 w-2/3 leading-tight">Физических качеств (категорий)</p>
+                                    <p className="text-right w-1/3 text-xl font-bold text-slate-900">
+                                      <span className={numCategoriesExecuted >= currentQuotas.bronze ? 'text-green-600' : 'text-red-600'}>{numCategoriesExecuted}</span> <span className="text-xs font-medium text-slate-400">из {currentQuotas.gold}</span>
+                                    </p>
+                                </div>
+                                <div className="flex justify-between items-center pb-1">
+                                    <p className="text-slate-700 w-2/3 leading-tight">Всего тестов (испытаний)</p>
+                                    <p className="text-right w-1/3 text-xl font-bold text-slate-900">
+                                      <span className={numTestsExecuted >= currentQuotas.bronze ? 'text-green-600' : 'text-red-600'}>{numTestsExecuted}</span> <span className="text-xs font-medium text-slate-400">из {currentQuotas.gold}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Оставляем Ближайшие цели как есть, это по-прежнему важно */}
+                        {worstExecutedBadge !== 'gold' && (
                             <div className="bg-white p-5 rounded-3xl shadow-sm">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                     <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                    Ближайшие цели
+                                    Ближайшие цели (по результатам тестов)
                                 </h3>
                                 <div className="space-y-4">
-                                    {deficits.map(d => (
+                                    {bestResultsByCategory.filter(r => r.result.badge !== 'gold').map(d => (
                                         <div key={d.name} className="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0 last:pb-0">
                                             <p className="text-sm font-medium text-slate-700 w-1/2 pr-2 leading-tight">{d.name}</p>
                                             <div className="text-right">
-                                                <p className={`text-[10px] uppercase font-bold tracking-wider ${badgeColorsMap[d.result.nextBadge]}`}>
+                                                <p className={`text-[10px] uppercase font-bold tracking-wider ${{'gold': 'text-yellow-600', 'silver': 'text-slate-500', 'bronze': 'text-orange-600'}[d.result.nextBadge]}`}>
                                                     Цель: {badgeNames[d.result.nextBadge]}
                                                 </p>
                                                 <p className="text-sm font-mono font-bold text-slate-900 whitespace-nowrap mt-0.5">
@@ -312,21 +362,24 @@
                                     ))}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="bg-white p-6 rounded-3xl text-center shadow-sm">
-                                <p className="text-lg font-bold text-green-600">Все нормативы выполнены на Золото!</p>
-                            </div>
+                        )}
+                        {worstExecutedBadge === 'gold' && finalBadge === 'gold' && (
+                          <div className="bg-white p-6 rounded-3xl text-center shadow-sm">
+                              <p className="text-lg font-bold text-green-600">Все выполненные категории на Золото!</p>
+                          </div>
                         )}
                     </div>
                 );
             };
 
             const renderPlan = () => {
-                if (deficits.length === 0) {
+              // В плане тренировок используем худшую сданную категорию
+                const executedDeficits = bestResultsByCategory.filter(r => r.result.badge !== 'gold');
+                if (executedDeficits.length === 0) {
                     return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний! Тренировки идут по плану.</div>;
                 }
 
-                const weakCategories = [...new Set(deficits.map(d => d.category))];
+                const weakCategories = [...new Set(executedDeficits.map(d => d.category))];
                 
                 const adviceMap = {
                     'Скоростные возможности': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
