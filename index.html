@@ -56,15 +56,24 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
-        const parseTime = (val) => {
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ ПАРСИНГА
+        const parseTime = (val, unit) => {
             if (!val) return null;
             if (typeof val === 'number') return val;
             val = val.toString().replace(',', '.');
+            
             if (val.includes(':')) {
                 const parts = val.split(':');
                 return parseInt(parts[0] || 0) * 60 + parseFloat(parts[1] || 0);
             }
-            return parseFloat(val);
+            
+            const floatVal = parseFloat(val);
+            // Если ввели просто число без двоеточия (например, "60"),
+            // а норматив измеряется в минутах, умножаем на 60, чтобы перевести в секунды.
+            if (unit === 'мин:с') {
+                return floatVal * 60;
+            }
+            return floatVal;
         };
 
         const formatGap = (gap, unit) => {
@@ -76,12 +85,15 @@
             return `${Math.round(gap * 10) / 10} ${unit}`;
         };
 
+        // ОБНОВЛЕННЫЙ РАСЧЕТ РЕЗУЛЬТАТОВ
         const calculateResult = (discipline, inputValue) => {
             if (!inputValue) return null;
-            const val = parseTime(inputValue);
-            const g = parseTime(discipline.gold);
-            const s = parseTime(discipline.silver);
-            const b = parseTime(discipline.bronze);
+            
+            // Теперь мы передаем discipline.unit в функцию parseTime
+            const val = parseTime(inputValue, discipline.unit);
+            const g = parseTime(discipline.gold, discipline.unit);
+            const s = parseTime(discipline.silver, discipline.unit);
+            const b = parseTime(discipline.bronze, discipline.unit);
             const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
 
             if (isTime) {
@@ -179,7 +191,6 @@
                                                 <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
                                             </div>
                                             
-                                            {/* ОБНОВЛЕННЫЙ БЛОК ПОЛЯ ВВОДА С ЕДИНИЦЕЙ ИЗМЕРЕНИЯ */}
                                             <div className="w-1/2 relative flex items-center justify-end">
                                                 <input 
                                                     type="text" 
