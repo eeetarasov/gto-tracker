@@ -76,6 +76,12 @@
 
         const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
 
+        const getPlural = (num) => {
+            if (num % 10 === 1 && num % 100 !== 11) return 'состязание';
+            if ([2, 3, 4].includes(num % 10) && ![12, 13, 14].includes(num % 100)) return 'состязания';
+            return 'состязаний';
+        };
+
         const parseTime = (val, unit) => {
             if (!val) return null;
             if (typeof val === 'number') return val;
@@ -130,6 +136,7 @@
             const [inputs, setInputs] = useState({});
             const [userName, setUserName] = useState('Атлет');
             const [userId, setUserId] = useState(null);
+            const [expandedCategories, setExpandedCategories] = useState({});
 
             useEffect(() => {
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -155,6 +162,7 @@
                 } else {
                     setInputs({});
                 }
+                setExpandedCategories({});
             }, [userId, gender]);
 
             const handleInput = (name, val) => {
@@ -172,6 +180,13 @@
                         localStorage.removeItem(`gto_${userId}_${gender}`);
                     }
                 }
+            };
+
+            const toggleCategory = (cat) => {
+                setExpandedCategories(prev => ({
+                    ...prev,
+                    [cat]: !prev[cat]
+                }));
             };
 
             const currentData = useMemo(() => gtoData.filter(d => d.gender === gender), [gender]);
@@ -218,33 +233,69 @@
                                         {type === 'Обязательное' ? 'Обязательные испытания' : 'Испытания по выбору'}
                                     </h2>
                                     
-                                    {categories.map(cat => (
-                                        <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm">
-                                            <h3 className="text-lg font-bold text-slate-800 mb-4">{cat}</h3>
-                                            <div className="space-y-4">
-                                                {typeData.filter(d => d.category === cat).map(d => (
-                                                    <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                                                        <div className="w-1/2 pr-2">
-                                                            <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
+                                    {categories.map(cat => {
+                                        const catDisciplines = typeData.filter(d => d.category === cat);
+                                        const isMulti = catDisciplines.length > 1;
+                                        const isExpanded = !isMulti || expandedCategories[cat];
+                                        const hasData = catDisciplines.some(d => inputs[d.name]);
+
+                                        return (
+                                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm transition-all duration-200">
+                                                
+                                                <div 
+                                                    className={`flex items-center justify-between ${isMulti ? 'cursor-pointer select-none' : ''} ${isExpanded && isMulti ? 'mb-4' : ''}`}
+                                                    onClick={() => isMulti && toggleCategory(cat)}
+                                                >
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="text-lg font-bold text-slate-800">{cat}</h3>
+                                                            {hasData && !isExpanded && (
+                                                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                                            )}
                                                         </div>
-                                                        <div className="w-1/2 relative flex items-center justify-end">
-                                                            <input 
-                                                                type="text" 
-                                                                inputMode="decimal"
-                                                                value={inputs[d.name] || ''}
-                                                                onChange={(e) => handleInput(d.name, e.target.value)}
-                                                                placeholder="0"
-                                                                className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-16 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-                                                            />
-                                                            <span className="absolute right-3 text-[10px] font-bold text-slate-400 uppercase tracking-wide pointer-events-none select-none">
-                                                                {d.unit}
-                                                            </span>
-                                                        </div>
+                                                        {!isExpanded && isMulti && (
+                                                            <p className="text-xs text-slate-400 font-medium mt-0.5">({catDisciplines.length} {getPlural(catDisciplines.length)})</p>
+                                                        )}
                                                     </div>
-                                                ))}
+
+                                                    {isMulti && (
+                                                        <div className="text-slate-400">
+                                                            {isExpanded ? (
+                                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path></svg>
+                                                            ) : (
+                                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="space-y-4">
+                                                        {catDisciplines.map(d => (
+                                                            <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                                                                <div className="w-1/2 pr-2">
+                                                                    <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
+                                                                </div>
+                                                                <div className="w-1/2 relative flex items-center justify-end">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        inputMode="decimal"
+                                                                        value={inputs[d.name] || ''}
+                                                                        onChange={(e) => handleInput(d.name, e.target.value)}
+                                                                        placeholder="0"
+                                                                        className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-16 pl-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                                                                    />
+                                                                    <span className="absolute right-3 text-[10px] font-bold text-slate-400 uppercase tracking-wide pointer-events-none select-none">
+                                                                        {d.unit}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             );
                         })}
@@ -280,7 +331,6 @@
                 const currentKey = `${gender}_${gender === 'М' ? 10 : 9}`;
                 const currentQuotas = gtoQuotaData[currentKey] || gtoQuotaData['М_10']; 
                 
-                // РАЗДЕЛЕНИЕ НА ОБЯЗАТЕЛЬНЫЕ И ПО ВЫБОРУ
                 const mandatoryCategories = [...new Set(currentData.filter(d => d.type === 'Обязательное').map(d => d.category))];
                 const reqMandatory = mandatoryCategories.length;
                 const reqOptionalGold = currentQuotas.gold - reqMandatory;
@@ -295,7 +345,6 @@
                     else if (executedOptionalCount >= reqOptionalSilver) badgeByQuota = 'silver';
                 }
 
-                // Финальный статус: минимум между квотой и слабым звеном
                 const finalBadge = badgeValues[badgeByQuota] < badgeValues[worstExecutedBadge] ? badgeByQuota : worstExecutedBadge;
 
                 const headerColors = {
@@ -315,7 +364,6 @@
                             {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по категориям не выполнены</p>}
                         </div>
 
-                        {/* ОБНОВЛЕННЫЙ БЛОК КВОТ С ЖЕСТКИМ РАЗДЕЛЕНИЕМ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                 <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
