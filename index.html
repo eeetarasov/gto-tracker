@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ГТО PRO_TRACKER</title>
+    
+    <!-- Telegram Mini Apps SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel для браузера -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Паттерн, вдохновленный кружевом, для шапки */
+        .lace-pattern {
+            background-image: 
+                radial-gradient(circle at center, rgba(255,255,255,0.15) 2px, transparent 2.5px),
+                radial-gradient(circle at center, rgba(255,255,255,0.1) 1px, transparent 1.5px);
+            background-size: 24px 24px, 12px 12px;
+            background-position: 0 0, 12px 12px;
+        }
+        /* Убираем стрелочки у полей ввода чисел */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; margin: 0; 
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- БАЗА ДАННЫХ НОРМАТИВОВ ---
+        const gtoData = [
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скорость', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на высокой перекладине', unit: 'раз', gold: 13, silver: 8, bronze: 4 },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Рывок гири 16 кг', unit: 'раз', gold: 40, silver: 22, bronze: 18 },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед', unit: 'см', gold: 11, silver: 5, bronze: 3 },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скорость', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 2000 м', unit: 'мин:с', gold: '11:15', silver: '12:50', bronze: '14:20' },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 17, silver: 12, bronze: 8 },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед', unit: 'см', gold: 14, silver: 9, bronze: 7 }
+        ];
+
+        // --- ВСПОМОГАТЕЛЬНАЯ ЛОГИКА (ВРЕМЯ И СРАВНЕНИЯ) ---
+        const parseTime = (val) => {
+            if (!val) return null;
+            if (typeof val === 'number') return val;
+            val = val.toString().replace(',', '.');
+            if (val.includes(':')) {
+                const parts = val.split(':');
+                return parseInt(parts[0] || 0) * 60 + parseFloat(parts[1] || 0);
+            }
+            return parseFloat(val);
+        };
+
+        const formatGap = (gap, unit) => {
+            if (unit === 'мин:с') {
+                const m = Math.floor(gap / 60);
+                const s = Math.floor(gap % 60);
+                return m > 0 ? `${m} мин ${s} сек` : `${s} сек`;
+            }
+            return `${Math.round(gap * 10) / 10} ${unit}`;
+        };
+
+        const calculateResult = (discipline, inputValue) => {
+            if (!inputValue) return null;
+            const val = parseTime(inputValue);
+            const g = parseTime(discipline.gold);
+            const s = parseTime(discipline.silver);
+            const b = parseTime(discipline.bronze);
+            const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
+
+            if (isTime) {
+                if (val <= g) return { badge: 'gold', gap: 0 };
+                if (val <= s) return { badge: 'silver', gap: val - g };
+                if (val <= b) return { badge: 'bronze', gap: val - g };
+                return { badge: 'none', gap: val - g };
+            } else {
+                if (val >= g) return { badge: 'gold', gap: 0 };
+                if (val >= s) return { badge: 'silver', gap: g - val };
+                if (val >= b) return { badge: 'bronze', gap: g - val };
+                return { badge: 'none', gap: g - val };
+            }
+        };
+
+        // --- ГЛАВНЫЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ ---
+        const App = () => {
+            const [view, setView] = useState('calculator'); // calculator, dashboard, plan
+            const [gender, setGender] = useState('М');
+            const [inputs, setInputs] = useState({});
+            const [userName, setUserName] = useState('Атлет');
+            const [userId, setUserId] = useState(null);
+
+            // Инициализация Telegram и загрузка данных
+            useEffect(() => {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                    const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+                    if (tgUser) {
+                        setUserName(tgUser.first_name);
+                        setUserId(tgUser.id.toString());
+                    } else {
+                        setUserId('guest');
+                    }
+                } else {
+                    setUserId('guest');
+                }
+            }, []);
+
+            // Загрузка сохранений из localStorage
+            useEffect(() => {
+                if (!userId) return;
+                const saved = localStorage.getItem(`gto_${userId}_${gender}`);
+                if (saved) {
+                    try { setInputs(JSON.parse(saved)); } catch (e) {}
+                } else {
+                    setInputs({});
+                }
+            }, [userId, gender]);
+
+            // Автосохранение при вводе
+            const handleInput = (name, val) => {
+                const newInputs = { ...inputs, [name]: val };
+                setInputs(newInputs);
+                if (userId) {
+                    localStorage.setItem(`gto_${userId}_${gender}`, JSON.stringify(newInputs));
+                }
+            };
+
+            const currentData = useMemo(() => gtoData.filter(d => d.gender === gender), [gender]);
+            
+            const results = useMemo(() => {
+                return currentData.map(d => {
+                    const res = calculateResult(d, inputs[d.name]);
+                    return { ...d, result: res };
+                }).filter(d => d.result !== null);
+            }, [currentData, inputs]);
+
+            const deficits = results.filter(r => r.result.badge !== 'gold');
+
+            // --- РЕНДЕР КАТЕГОРИЙ (КАЛЬКУЛЯТОР) ---
+            const renderCalculator = () => {
+                const categories = [...new Set(currentData.map(d => d.category))];
+                return (
+                    <div className="px-4 space-y-6">
+                        {categories.map(cat => (
+                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4">{cat}</h3>
+                                <div className="space-y-4">
+                                    {currentData.filter(d => d.category === cat).map(d => (
+                                        <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                                            <div className="w-2/3 pr-2">
+                                                <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
+                                                <p className="text-xs text-slate-400 mt-1">Золото: {d.gold} {d.unit}</p>
+                                            </div>
+                                            <div className="w-1/3 relative">
+                                                <input 
+                                                    type="text" 
+                                                    inputMode="decimal"
+                                                    value={inputs[d.name] || ''}
+                                                    onChange={(e) => handleInput(d.name, e.target.value)}
+                                                    placeholder="0"
+                                                    className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                        <button 
+                            onClick={() => setView('dashboard')}
+                            className="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-full shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
+                        >
+                            РАССЧИТАТЬ РЕЗУЛЬТАТ
+                        </button>
+                    </div>
+                );
+            };
+
+            // --- РЕНДЕР АНАЛИТИКИ (ДАШБОРД) ---
+            const renderDashboard = () => {
+                if (results.length === 0) {
+                    return (
+                        <div className="px-4 text-center mt-10">
+                            <p className="text-slate-500 mb-4">Вы еще не ввели результаты.</p>
+                            <button onClick={() => setView('calculator')} className="text-blue-600 font-semibold border border-blue-600 px-6 py-2 rounded-full">Вернуться к вводу</button>
+                        </div>
+                    );
+                }
+
+                // Определение общего знака
+                let overall = 'gold';
+                if (results.some(r => r.result.badge === 'none')) overall = 'none';
+                else if (results.some(r => r.result.badge === 'bronze')) overall = 'bronze';
+                else if (results.some(r => r.result.badge === 'silver')) overall = 'silver';
+
+                const badgeColors = {
+                    'gold': 'bg-yellow-400 text-yellow-900',
+                    'silver': 'bg-slate-300 text-slate-800',
+                    'bronze': 'bg-orange-300 text-orange-900',
+                    'none': 'bg-red-100 text-red-600'
+                };
+                const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
+
+                return (
+                    <div className="px-4 space-y-6">
+                        <div className={`p-6 rounded-3xl shadow-sm text-center ${badgeColors[overall]} flex flex-col items-center justify-center`}>
+                            <h2 className="text-sm uppercase tracking-wide font-bold opacity-80 mb-1">Предварительный результат</h2>
+                            <p className="text-3xl font-black">{badgeNames[overall]}</p>
+                        </div>
+
+                        {deficits.length > 0 ? (
+                            <div className="bg-white p-5 rounded-3xl shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                    <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                    Зоны роста (Дефицит до Золота)
+                                </h3>
+                                <div className="space-y-4">
+                                    {deficits.map(d => (
+                                        <div key={d.name} className="flex justify-between items-center border-l-4 border-blue-500 pl-3">
+                                            <p className="text-sm font-medium text-slate-700">{d.name}</p>
+                                            <p className="text-sm font-mono font-bold text-red-500 whitespace-nowrap">
+                                                -{formatGap(d.result.gap, d.unit)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => setView('plan')} className="mt-6 w-full bg-slate-100 text-blue-600 font-bold py-3 rounded-xl active:bg-slate-200 transition-colors">
+                                    Получить план тренировок →
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="bg-white p-6 rounded-3xl text-center shadow-sm">
+                                <p className="text-lg font-bold text-green-600">Идеально! Все нормативы на Золото.</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            // --- РЕНДЕР ПЛАНА ТРЕНИРОВОК ---
+            const renderPlan = () => {
+                if (deficits.length === 0) {
+                    return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний! Вы готовы к сдаче.</div>;
+                }
+
+                const weakCategories = [...new Set(deficits.map(d => d.category))];
+                
+                const adviceMap = {
+                    'Скорость': 'Интервальные беговые тренировки. Делайте 5-6 ускорений по 30-50 метров с максимальной отдачей. Отдых между подходами — до полного восстановления дыхания (2-3 мин).',
+                    'Выносливость': 'Длительный равномерный бег (кросс). Бегайте 2-3 раза в неделю по 30-40 минут на низком пульсе (чтобы можно было спокойно разговаривать во время бега).',
+                    'Сила': 'Работа в "отказ". 3 раза в неделю выполняйте отстающее упражнение: 3-4 подхода на максимальное количество повторений. Обязательно отдыхайте 1-2 дня между силовыми.',
+                    'Гибкость': 'Ежедневная растяжка разогретых мышц. Выполняйте наклоны с удержанием в нижней точке на 20-30 секунд. Не делайте резких рывков.'
+                };
+
+                return (
+                    <div className="px-4 space-y-5">
+                        <h2 className="text-xl font-bold text-slate-800 mb-2">Ваш персональный план</h2>
+                        {weakCategories.map(cat => (
+                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                                <div className="flex items-center mb-3">
+                                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                    </div>
+                                    <h3 className="font-bold text-lg text-slate-800">Прокачать: {cat}</h3>
+                                </div>
+                                <p className="text-slate-600 text-sm leading-relaxed">{adviceMap[cat]}</p>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            // --- ОСНОВНОЙ КАРКАС ---
+            return (
+                <div className="min-h-screen">
+                    {/* Шапка с узором */}
+                    <div className="bg-blue-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-md relative overflow-hidden mb-[-2rem]">
+                        <div className="absolute inset-0 lace-pattern opacity-30"></div>
+                        <div className="relative z-10">
+                            <h1 className="text-2xl font-black tracking-tight mb-1">ГТО PRO_TRACKER</h1>
+                            <p className="text-blue-200 font-medium text-sm">Привет, {userName}! Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</p>
+                            
+                            {/* Переключатель пола (только на вкладке калькулятора) */}
+                            {view === 'calculator' && (
+                                <div className="mt-6 flex bg-blue-700/50 p-1 rounded-full w-48 backdrop-blur-sm border border-blue-500/30">
+                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Мужчины</button>
+                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Женщины</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Рабочая область */}
+                    <div className="relative z-20">
+                        {view === 'calculator' && renderCalculator()}
+                        {view === 'dashboard' && renderDashboard()}
+                        {view === 'plan' && renderPlan()}
+                    </div>
+
+                    {/* Нижняя навигация */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-50">
+                        <div className="flex justify-around items-center h-16">
+                            <button onClick={() => setView('calculator')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                <span className="text-[10px] font-bold">Ввод</span>
+                            </button>
+                            <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                <span className="text-[10px] font-bold">Анализ</span>
+                            </button>
+                            <button onClick={() => setView('plan')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                                <span className="text-[10px] font-bold">План</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
