@@ -280,7 +280,6 @@
 
                 const weakCategories = [...new Set(deficits.map(d => d.category))];
                 
-                // ОБНОВЛЕННАЯ КАРТА СОВЕТОВ ДЛЯ НОВЫХ НАЗВАНИЙ КАТЕГОРИЙ
                 const adviceMap = {
                     'Скоростные возможности': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
                     'Выносливость': { title: 'Равномерный бег', text: 'Длительный кросс 2-3 раза в неделю (30-40 мин) на низком пульсе, чтобы можно было спокойно разговаривать.' },
@@ -308,11 +307,23 @@
                     <div className="bg-blue-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-md relative overflow-hidden mb-[-2rem]">
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
-                            <h1 className="text-2xl font-black tracking-tight mb-1">ГТО PRO_TRACKER</h1>
+                            
+                            {/* БЛОК С ЛОГОТИПОМ ГТО ИЗ ЛОКАЛЬНОГО ФАЙЛА */}
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="bg-white p-1.5 rounded-xl shadow-md">
+                                    <img 
+                                        src="logo.png" 
+                                        alt="ГТО" 
+                                        className="h-8 w-auto object-contain"
+                                    />
+                                </div>
+                                <h1 className="text-xl font-black tracking-widest text-white drop-shadow-sm">PRO_TRACKER</h1>
+                            </div>
+                            
                             <p className="text-blue-200 font-medium text-sm">Привет, {userName}! Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</p>
                             
                             {view === 'calculator' && (
-                                <div className="mt-6 flex bg-blue-700/50 p-1 rounded-full w-48 backdrop-blur-sm border border-blue-500/30">
+                                <div className="mt-5 flex bg-blue-700/50 p-1 rounded-full w-48 backdrop-blur-sm border border-blue-500/30">
                                     <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Муж</button>
                                     <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Жен</button>
                                 </div>
