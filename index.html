@@ -5,21 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ГТО PRO_TRACKER</title>
     
-    <!-- Telegram Mini Apps SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel для браузера -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        /* Паттерн, вдохновленный кружевом, для шапки */
         .lace-pattern {
             background-image: 
                 radial-gradient(circle at center, rgba(255,255,255,0.15) 2px, transparent 2.5px),
@@ -27,7 +19,6 @@
             background-size: 24px 24px, 12px 12px;
             background-position: 0 0, 12px 12px;
         }
-        /* Убираем стрелочки у полей ввода чисел */
         input[type="number"]::-webkit-inner-spin-button, 
         input[type="number"]::-webkit-outer-spin-button { 
             -webkit-appearance: none; margin: 0; 
@@ -40,7 +31,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- БАЗА ДАННЫХ НОРМАТИВОВ ---
         const gtoData = [
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скорость', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
@@ -53,7 +43,6 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед', unit: 'см', gold: 14, silver: 9, bronze: 7 }
         ];
 
-        // --- ВСПОМОГАТЕЛЬНАЯ ЛОГИКА (ВРЕМЯ И СРАВНЕНИЯ) ---
         const parseTime = (val) => {
             if (!val) return null;
             if (typeof val === 'number') return val;
@@ -69,11 +58,12 @@
             if (unit === 'мин:с') {
                 const m = Math.floor(gap / 60);
                 const s = Math.floor(gap % 60);
-                return m > 0 ? `${m} мин ${s} сек` : `${s} сек`;
+                return m > 0 ? `${m} мин ${s} с` : `${s} с`;
             }
             return `${Math.round(gap * 10) / 10} ${unit}`;
         };
 
+        // НОВАЯ ЛОГИКА СРАВНЕНИЯ ПО СТУПЕНЯМ
         const calculateResult = (discipline, inputValue) => {
             if (!inputValue) return null;
             const val = parseTime(inputValue);
@@ -83,27 +73,25 @@
             const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
 
             if (isTime) {
-                if (val <= g) return { badge: 'gold', gap: 0 };
-                if (val <= s) return { badge: 'silver', gap: val - g };
-                if (val <= b) return { badge: 'bronze', gap: val - g };
-                return { badge: 'none', gap: val - g };
+                if (val <= g) return { badge: 'gold', nextBadge: null, gap: 0 };
+                if (val <= s) return { badge: 'silver', nextBadge: 'gold', gap: val - g };
+                if (val <= b) return { badge: 'bronze', nextBadge: 'silver', gap: val - s };
+                return { badge: 'none', nextBadge: 'bronze', gap: val - b };
             } else {
-                if (val >= g) return { badge: 'gold', gap: 0 };
-                if (val >= s) return { badge: 'silver', gap: g - val };
-                if (val >= b) return { badge: 'bronze', gap: g - val };
-                return { badge: 'none', gap: g - val };
+                if (val >= g) return { badge: 'gold', nextBadge: null, gap: 0 };
+                if (val >= s) return { badge: 'silver', nextBadge: 'gold', gap: g - val };
+                if (val >= b) return { badge: 'bronze', nextBadge: 'silver', gap: s - val };
+                return { badge: 'none', nextBadge: 'bronze', gap: b - val };
             }
         };
 
-        // --- ГЛАВНЫЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ ---
         const App = () => {
-            const [view, setView] = useState('calculator'); // calculator, dashboard, plan
+            const [view, setView] = useState('calculator');
             const [gender, setGender] = useState('М');
             const [inputs, setInputs] = useState({});
             const [userName, setUserName] = useState('Атлет');
             const [userId, setUserId] = useState(null);
 
-            // Инициализация Telegram и загрузка данных
             useEffect(() => {
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.ready();
@@ -120,7 +108,6 @@
                 }
             }, []);
 
-            // Загрузка сохранений из localStorage
             useEffect(() => {
                 if (!userId) return;
                 const saved = localStorage.getItem(`gto_${userId}_${gender}`);
@@ -131,7 +118,6 @@
                 }
             }, [userId, gender]);
 
-            // Автосохранение при вводе
             const handleInput = (name, val) => {
                 const newInputs = { ...inputs, [name]: val };
                 setInputs(newInputs);
@@ -151,7 +137,13 @@
 
             const deficits = results.filter(r => r.result.badge !== 'gold');
 
-            // --- РЕНДЕР КАТЕГОРИЙ (КАЛЬКУЛЯТОР) ---
+            const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
+            const badgeColorsMap = {
+                'gold': 'text-yellow-600',
+                'silver': 'text-slate-500',
+                'bronze': 'text-orange-600'
+            };
+
             const renderCalculator = () => {
                 const categories = [...new Set(currentData.map(d => d.category))];
                 return (
@@ -164,7 +156,6 @@
                                         <div key={d.name} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                                             <div className="w-2/3 pr-2">
                                                 <p className="text-sm font-medium text-slate-700 leading-tight">{d.name}</p>
-                                                <p className="text-xs text-slate-400 mt-1">Золото: {d.gold} {d.unit}</p>
                                             </div>
                                             <div className="w-1/3 relative">
                                                 <input 
@@ -185,13 +176,12 @@
                             onClick={() => setView('dashboard')}
                             className="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-full shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
                         >
-                            РАССЧИТАТЬ РЕЗУЛЬТАТ
+                            РАССЧИТАТЬ
                         </button>
                     </div>
                 );
             };
 
-            // --- РЕНДЕР АНАЛИТИКИ (ДАШБОРД) ---
             const renderDashboard = () => {
                 if (results.length === 0) {
                     return (
@@ -202,119 +192,111 @@
                     );
                 }
 
-                // Определение общего знака
                 let overall = 'gold';
                 if (results.some(r => r.result.badge === 'none')) overall = 'none';
                 else if (results.some(r => r.result.badge === 'bronze')) overall = 'bronze';
                 else if (results.some(r => r.result.badge === 'silver')) overall = 'silver';
 
-                const badgeColors = {
+                const headerColors = {
                     'gold': 'bg-yellow-400 text-yellow-900',
                     'silver': 'bg-slate-300 text-slate-800',
                     'bronze': 'bg-orange-300 text-orange-900',
                     'none': 'bg-red-100 text-red-600'
                 };
-                const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
 
                 return (
                     <div className="px-4 space-y-6">
-                        <div className={`p-6 rounded-3xl shadow-sm text-center ${badgeColors[overall]} flex flex-col items-center justify-center`}>
-                            <h2 className="text-sm uppercase tracking-wide font-bold opacity-80 mb-1">Предварительный результат</h2>
+                        <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[overall]} flex flex-col items-center justify-center`}>
+                            <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
                             <p className="text-3xl font-black">{badgeNames[overall]}</p>
                         </div>
 
                         {deficits.length > 0 ? (
                             <div className="bg-white p-5 rounded-3xl shadow-sm">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                    <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                    Зоны роста (Дефицит до Золота)
+                                    <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                    Ближайшие цели
                                 </h3>
                                 <div className="space-y-4">
                                     {deficits.map(d => (
-                                        <div key={d.name} className="flex justify-between items-center border-l-4 border-blue-500 pl-3">
-                                            <p className="text-sm font-medium text-slate-700">{d.name}</p>
-                                            <p className="text-sm font-mono font-bold text-red-500 whitespace-nowrap">
-                                                -{formatGap(d.result.gap, d.unit)}
-                                            </p>
+                                        <div key={d.name} className="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                                            <p className="text-sm font-medium text-slate-700 w-1/2 pr-2 leading-tight">{d.name}</p>
+                                            <div className="text-right">
+                                                <p className={`text-[10px] uppercase font-bold tracking-wider ${badgeColorsMap[d.result.nextBadge]}`}>
+                                                    Цель: {badgeNames[d.result.nextBadge]}
+                                                </p>
+                                                <p className="text-sm font-mono font-bold text-slate-900 whitespace-nowrap mt-0.5">
+                                                    осталось <span className="text-blue-600">{formatGap(d.result.gap, d.unit)}</span>
+                                                </p>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={() => setView('plan')} className="mt-6 w-full bg-slate-100 text-blue-600 font-bold py-3 rounded-xl active:bg-slate-200 transition-colors">
-                                    Получить план тренировок →
-                                </button>
                             </div>
                         ) : (
                             <div className="bg-white p-6 rounded-3xl text-center shadow-sm">
-                                <p className="text-lg font-bold text-green-600">Идеально! Все нормативы на Золото.</p>
+                                <p className="text-lg font-bold text-green-600">Все нормативы выполнены на Золото!</p>
                             </div>
                         )}
                     </div>
                 );
             };
 
-            // --- РЕНДЕР ПЛАНА ТРЕНИРОВОК ---
             const renderPlan = () => {
                 if (deficits.length === 0) {
-                    return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний! Вы готовы к сдаче.</div>;
+                    return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний! Тренировки идут по плану.</div>;
                 }
 
                 const weakCategories = [...new Set(deficits.map(d => d.category))];
                 
+                // СТРУКТУРИРОВАННЫЕ КАРТОЧКИ СОВЕТОВ
                 const adviceMap = {
-                    'Скорость': 'Интервальные беговые тренировки. Делайте 5-6 ускорений по 30-50 метров с максимальной отдачей. Отдых между подходами — до полного восстановления дыхания (2-3 мин).',
-                    'Выносливость': 'Длительный равномерный бег (кросс). Бегайте 2-3 раза в неделю по 30-40 минут на низком пульсе (чтобы можно было спокойно разговаривать во время бега).',
-                    'Сила': 'Работа в "отказ". 3 раза в неделю выполняйте отстающее упражнение: 3-4 подхода на максимальное количество повторений. Обязательно отдыхайте 1-2 дня между силовыми.',
-                    'Гибкость': 'Ежедневная растяжка разогретых мышц. Выполняйте наклоны с удержанием в нижней точке на 20-30 секунд. Не делайте резких рывков.'
+                    'Скорость': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
+                    'Выносливость': { title: 'Равномерный бег', text: 'Длительный кросс 2-3 раза в неделю (30-40 мин) на низком пульсе, чтобы можно было спокойно разговаривать.' },
+                    'Сила': { title: 'Работа "в отказ"', text: '3-4 подхода на максимум повторений (3 раза в неделю). Обязательно отдыхайте 1-2 дня между тренировками.' },
+                    'Гибкость': { title: 'Статическая растяжка', text: 'Наклоны с удержанием в нижней точке на 20-30 секунд. Выполняйте на разогретые мышцы без рывков.' }
                 };
 
                 return (
-                    <div className="px-4 space-y-5">
-                        <h2 className="text-xl font-bold text-slate-800 mb-2">Ваш персональный план</h2>
+                    <div className="px-4 space-y-4">
                         {weakCategories.map(cat => (
-                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                                <div className="flex items-center mb-3">
-                                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                    </div>
-                                    <h3 className="font-bold text-lg text-slate-800">Прокачать: {cat}</h3>
+                            <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{cat}</span>
                                 </div>
-                                <p className="text-slate-600 text-sm leading-relaxed">{adviceMap[cat]}</p>
+                                <h3 className="font-bold text-slate-900 text-lg leading-tight mb-2">{adviceMap[cat].title}</h3>
+                                <p className="text-slate-500 text-sm leading-relaxed">{adviceMap[cat].text}</p>
                             </div>
                         ))}
                     </div>
                 );
             };
 
-            // --- ОСНОВНОЙ КАРКАС ---
             return (
                 <div className="min-h-screen">
-                    {/* Шапка с узором */}
                     <div className="bg-blue-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-md relative overflow-hidden mb-[-2rem]">
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
                             <h1 className="text-2xl font-black tracking-tight mb-1">ГТО PRO_TRACKER</h1>
                             <p className="text-blue-200 font-medium text-sm">Привет, {userName}! Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</p>
                             
-                            {/* Переключатель пола (только на вкладке калькулятора) */}
                             {view === 'calculator' && (
                                 <div className="mt-6 flex bg-blue-700/50 p-1 rounded-full w-48 backdrop-blur-sm border border-blue-500/30">
-                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Мужчины</button>
-                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Женщины</button>
+                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Муж</button>
+                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Жен</button>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Рабочая область */}
-                    <div className="relative z-20">
+                    <div className="relative z-20 mt-4">
                         {view === 'calculator' && renderCalculator()}
                         {view === 'dashboard' && renderDashboard()}
                         {view === 'plan' && renderPlan()}
                     </div>
 
-                    {/* Нижняя навигация */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-50">
-                        <div className="flex justify-around items-center h-16">
+                        <div className="flex justify-around items-center h-16 max-w-md mx-auto">
                             <button onClick={() => setView('calculator')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                 <span className="text-[10px] font-bold">Ввод</span>
@@ -338,4 +320,5 @@
     </script>
 </body>
 </html>
+
 
