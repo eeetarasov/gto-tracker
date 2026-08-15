@@ -31,16 +31,30 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // ПОЛНАЯ БАЗА ДАННЫХ СО ВСЕМИ УПРАЖНЕНИЯМИ ИЗ СКРИНШОТОВ
         const gtoData = [
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скорость', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
+            // МУЖЧИНЫ 10 СТУПЕНЬ
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 5 км', unit: 'мин:с', gold: '22:30', silver: '26:00', bronze: '28:30' },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 1000 м', unit: 'мин:с', gold: '3:45', silver: '4:06', bronze: '5:02' },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на лыжах на 5 км', unit: 'мин:с', gold: '23:00', silver: '26:30', bronze: '29:30' },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед (см)', unit: 'см', gold: 11, silver: 5, bronze: 3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на высокой перекладине', unit: 'раз', gold: 13, silver: 8, bronze: 4 },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 33, silver: 19, bronze: 15 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Рывок гири 16 кг', unit: 'раз', gold: 40, silver: 22, bronze: 18 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед', unit: 'см', gold: 11, silver: 5, bronze: 3 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скорость', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
+            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 23, silver: 15, bronze: 10 },
+
+            // ЖЕНЩИНЫ 9 СТУПЕНЬ
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 100 м', unit: 'с', gold: 16.7, silver: 17.9, bronze: 19.1 },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 1000 м', unit: 'мин:с', gold: '4:20', silver: '4:40', bronze: '5:10' },
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 2000 м', unit: 'мин:с', gold: '11:15', silver: '12:50', bronze: '14:20' },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 3 км', unit: 'мин:с', gold: '17:40', silver: '19:50', bronze: '22:30' },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на лыжах на 3 км', unit: 'мин:с', gold: '18:10', silver: '20:20', bronze: '23:00' },
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед (см)', unit: 'см', gold: 14, silver: 9, bronze: 7 },
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 17, silver: 12, bronze: 8 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед', unit: 'см', gold: 14, silver: 9, bronze: 7 }
+            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
         const parseTime = (val) => {
@@ -181,7 +195,6 @@
                             </div>
                         ))}
                         
-                        {/* Блок с двумя кнопками */}
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => setView('dashboard')}
@@ -267,8 +280,9 @@
 
                 const weakCategories = [...new Set(deficits.map(d => d.category))];
                 
+                // ОБНОВЛЕННАЯ КАРТА СОВЕТОВ ДЛЯ НОВЫХ НАЗВАНИЙ КАТЕГОРИЙ
                 const adviceMap = {
-                    'Скорость': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
+                    'Скоростные возможности': { title: 'Интервалы', text: 'Спринты 5х30м с максимальной отдачей. Отдых 2-3 минуты до полного восстановления дыхания.' },
                     'Выносливость': { title: 'Равномерный бег', text: 'Длительный кросс 2-3 раза в неделю (30-40 мин) на низком пульсе, чтобы можно было спокойно разговаривать.' },
                     'Сила': { title: 'Работа "в отказ"', text: '3-4 подхода на максимум повторений (3 раза в неделю). Обязательно отдыхайте 1-2 дня между тренировками.' },
                     'Гибкость': { title: 'Статическая растяжка', text: 'Наклоны с удержанием в нижней точке на 20-30 секунд. Выполняйте на разогретые мышцы без рывков.' }
@@ -281,8 +295,8 @@
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">{cat}</span>
                                 </div>
-                                <h3 className="font-bold text-slate-900 text-lg leading-tight mb-2">{adviceMap[cat].title}</h3>
-                                <p className="text-slate-500 text-sm leading-relaxed">{adviceMap[cat].text}</p>
+                                <h3 className="font-bold text-slate-900 text-lg leading-tight mb-2">{adviceMap[cat]?.title || 'Тренировка'}</h3>
+                                <p className="text-slate-500 text-sm leading-relaxed">{adviceMap[cat]?.text || 'Продолжайте регулярные тренировки для улучшения результата в этой категории.'}</p>
                             </div>
                         ))}
                     </div>
