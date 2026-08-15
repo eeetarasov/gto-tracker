@@ -56,7 +56,8 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ ПАРСИНГА
+        const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
+
         const parseTime = (val, unit) => {
             if (!val) return null;
             if (typeof val === 'number') return val;
@@ -68,8 +69,6 @@
             }
             
             const floatVal = parseFloat(val);
-            // Если ввели просто число без двоеточия (например, "60"),
-            // а норматив измеряется в минутах, умножаем на 60, чтобы перевести в секунды.
             if (unit === 'мин:с') {
                 return floatVal * 60;
             }
@@ -85,11 +84,9 @@
             return `${Math.round(gap * 10) / 10} ${unit}`;
         };
 
-        // ОБНОВЛЕННЫЙ РАСЧЕТ РЕЗУЛЬТАТОВ
         const calculateResult = (discipline, inputValue) => {
             if (!inputValue) return null;
             
-            // Теперь мы передаем discipline.unit в функцию parseTime
             const val = parseTime(inputValue, discipline.unit);
             const g = parseTime(discipline.gold, discipline.unit);
             const s = parseTime(discipline.silver, discipline.unit);
@@ -168,7 +165,20 @@
                 }).filter(d => d.result !== null);
             }, [currentData, inputs]);
 
-            const deficits = results.filter(r => r.result.badge !== 'gold');
+            // НОВАЯ ЛОГИКА: Оставляем только ЛУЧШИЙ результат в каждой категории
+            const bestResultsByCategory = useMemo(() => {
+                const best = {};
+                results.forEach(r => {
+                    const currentBadgeVal = badgeValues[r.result.badge];
+                    if (!best[r.category] || currentBadgeVal > badgeValues[best[r.category].result.badge]) {
+                        best[r.category] = r;
+                    }
+                });
+                return Object.values(best);
+            }, [results]);
+
+            // Отставания теперь считаются только по лучшим дисциплинам
+            const deficits = bestResultsByCategory.filter(r => r.result.badge !== 'gold');
 
             const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
             const badgeColorsMap = {
@@ -239,10 +249,11 @@
                     );
                 }
 
+                // НОВАЯ ЛОГИКА СТАТУСА: смотрим только на лучшие результаты в категориях
                 let overall = 'gold';
-                if (results.some(r => r.result.badge === 'none')) overall = 'none';
-                else if (results.some(r => r.result.badge === 'bronze')) overall = 'bronze';
-                else if (results.some(r => r.result.badge === 'silver')) overall = 'silver';
+                if (bestResultsByCategory.some(r => r.result.badge === 'none')) overall = 'none';
+                else if (bestResultsByCategory.some(r => r.result.badge === 'bronze')) overall = 'bronze';
+                else if (bestResultsByCategory.some(r => r.result.badge === 'silver')) overall = 'silver';
 
                 const headerColors = {
                     'gold': 'bg-yellow-400 text-yellow-900',
