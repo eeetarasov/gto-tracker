@@ -202,31 +202,40 @@
                 }
             };
 
-            // ФУНКЦИИ ТРЕНИРОВОК И АНТИФРОДА
-            const isTodayLocked = dailyData[todayStr]?.isLocked === true;
-
+            // ФУНКЦИИ ТРЕНИРОВОК С ПОШТУЧНОЙ БЛОКИРОВКОЙ
             const lockTodayTraining = () => {
-                const todayData = dailyData[todayStr];
-                // Проверяем, есть ли записанные упражнения (исключая саму метку isLocked)
-                if (!todayData) {
-                    showToast('Сначала введи хотя бы один результат! 📝');
-                    return;
-                }
-                const exerciseKeys = Object.keys(todayData).filter(k => k !== 'isLocked');
-                if (exerciseKeys.length === 0) {
-                    showToast('Сначала введи хотя бы один результат! 📝');
+                const todayData = dailyData[todayStr] || {};
+                let hasNew = false;
+                const newDaily = { ...dailyData };
+
+                if (!newDaily[todayStr]) newDaily[todayStr] = {};
+
+                // Проверяем каждое упражнение
+                ['run', 'pushups', 'flex', 'sprint'].forEach(ex => {
+                    const exData = todayData[ex] || {};
+                    // Если упражнение не залочено и в нем есть какие-то значения
+                    if (!exData.isLocked) {
+                        const hasValues = Object.keys(exData).some(k => k !== 'isLocked' && exData[k] !== '' && exData[k] !== 0);
+                        if (hasValues) {
+                            newDaily[todayStr][ex] = { ...exData, isLocked: true };
+                            hasNew = true;
+                        }
+                    }
+                });
+
+                if (!hasNew) {
+                    showToast('Сначала введи новые результаты! 📝');
                     return;
                 }
 
-                const newDaily = { ...dailyData };
-                newDaily[todayStr].isLocked = true;
                 setDailyData(newDaily);
                 if (userId) localStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
-                showToast('Тренировка за сегодня успешно сохранена! 🎉');
+                showToast('Новые результаты зафиксированы! 🎉');
             };
 
             const handleDailyInput = (exercise, field, val) => {
-                if (isTodayLocked) return;
+                // Блокируем только если КОНКРЕТНОЕ упражнение уже сохранено
+                if (dailyData[todayStr]?.[exercise]?.isLocked) return;
 
                 if (field === 'km' && parseFloat(val) > 50) {
                     showToast('Ультрамарафон на тренировке? Оставим это киборгам! 🏃‍♂️');
@@ -246,7 +255,6 @@
                 if (val === '' || val === 0) {
                     delete newDaily[todayStr][exercise][field];
                     if (Object.keys(newDaily[todayStr][exercise]).length === 0) delete newDaily[todayStr][exercise];
-                    // Очищаем день, если там не осталось ключей (кроме isLocked, но сюда мы попадаем только если он false)
                     if (Object.keys(newDaily[todayStr]).length === 0) delete newDaily[todayStr];
                 }
 
@@ -255,13 +263,11 @@
             };
 
             const updatePushups = (delta) => {
-                if (isTodayLocked) return;
+                if (dailyData[todayStr]?.pushups?.isLocked) return;
                 
                 const current = dailyData[todayStr]?.pushups?.count || 0;
                 const next = Math.max(0, current + delta);
                 
-                // ИСПРАВЛЕНИЕ: Блокируем ТОЛЬКО если пытаемся УВЕЛИЧИТЬ сверх лимита.
-                // Это позволит убавить цифру, если там уже ошибочно вбито > 200.
                 if (next > 200 && delta > 0) {
                     showToast('Киборг, помноженный на вечность? Вводи реальные цифры! 🤖');
                     return;
@@ -271,7 +277,7 @@
             };
 
             const validateSprint = () => {
-                if (isTodayLocked) return;
+                if (dailyData[todayStr]?.sprint?.isLocked) return;
                 const val = parseFloat(dailyData[todayStr]?.sprint?.sec);
                 if (val > 0 && val < 6.0) {
                     showToast('Полегче, Усейн Болт! Мировой рекорд 6.39с ⚡');
@@ -280,7 +286,7 @@
             };
 
             const validateRun = () => {
-                if (isTodayLocked) return;
+                if (dailyData[todayStr]?.run?.isLocked) return;
                 const km = parseFloat(dailyData[todayStr]?.run?.km);
                 const timeStr = dailyData[todayStr]?.run?.time;
                 if (km > 0 && timeStr) {
@@ -353,14 +359,16 @@
                 let currentStreak = 0;
                 let checkDate = new Date();
                 
-                // Если сегодня не залочено (или вообще пусто), проверяем вчера
-                if (!dailyData[getDateString(checkDate)]?.isLocked) {
+                // Функция проверки, был ли день активным (есть хотя бы одно залоченное упражнение)
+                const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
+
+                if (!isDayLocked(getDateString(checkDate))) {
                     checkDate.setDate(checkDate.getDate() - 1);
                 }
 
                 while (true) {
                     const dStr = getDateString(checkDate);
-                    if (dailyData[dStr]?.isLocked) {
+                    if (isDayLocked(dStr)) {
                         currentStreak++;
                         checkDate.setDate(checkDate.getDate() - 1);
                     } else {
@@ -374,11 +382,18 @@
                     return getDateString(d);
                 });
 
-                const todayRunDist = dailyData[todayStr]?.run?.km || '';
-                const todayRunTime = dailyData[todayStr]?.run?.time || '';
-                const todayPushups = dailyData[todayStr]?.pushups?.count || 0;
-                const todayFlex = dailyData[todayStr]?.flex?.cm || '';
-                const todaySprint = dailyData[todayStr]?.sprint?.sec || '';
+                const todayRun = dailyData[todayStr]?.run || {};
+                const todayPushups = dailyData[todayStr]?.pushups || {};
+                const todayFlex = dailyData[todayStr]?.flex || {};
+                const todaySprint = dailyData[todayStr]?.sprint || {};
+
+                // Проверяем, есть ли что-то новое для сохранения
+                const todayData = dailyData[todayStr] || {};
+                const hasUnlockedData = Object.keys(todayData).some(ex => {
+                    const exData = todayData[ex];
+                    return !exData.isLocked && Object.keys(exData).some(k => k !== 'isLocked' && exData[k] !== '' && exData[k] !== 0);
+                });
+                const hasLockedData = Object.values(todayData).some(ex => ex.isLocked);
 
                 return (
                     <div className="px-4 space-y-6 pt-6 pb-6 mb-6">
@@ -393,7 +408,7 @@
                             </div>
                             <div className="flex justify-between items-end gap-1">
                                 {last7Days.map((dStr, idx) => {
-                                    const isLocked = dailyData[dStr]?.isLocked;
+                                    const isLocked = isDayLocked(dStr);
                                     const isToday = idx === 6;
                                     return (
                                         <div key={dStr} className="flex flex-col items-center gap-1.5">
@@ -406,7 +421,9 @@
 
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 pt-2">Ежедневный трекинг</h2>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300" style={{ opacity: isTodayLocked ? 0.7 : 1 }}>
+                        {/* КАРТОЧКА БЕГА */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300 relative" style={{ opacity: todayRun.isLocked ? 0.7 : 1 }}>
+                            {todayRun.isLocked && <div className="absolute top-4 right-4 text-green-500 bg-green-50 rounded-full p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div>}
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">🏃‍♂️</div>
                                 <div>
@@ -416,17 +433,19 @@
                             </div>
                             <div className="flex gap-3">
                                 <div className="w-1/2 relative">
-                                    <input type="text" inputMode="decimal" placeholder="0" value={todayRunDist} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} onBlur={validateRun} disabled={isTodayLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-3 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <input type="text" inputMode="decimal" placeholder="0" value={todayRun.km || ''} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} onBlur={validateRun} disabled={todayRun.isLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-3 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">КМ</span>
                                 </div>
                                 <div className="w-1/2 relative">
-                                    <input type="text" inputMode="decimal" placeholder="00:00" value={todayRunTime} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} onBlur={validateRun} disabled={isTodayLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-3 pr-14 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <input type="text" inputMode="decimal" placeholder="00:00" value={todayRun.time || ''} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} onBlur={validateRun} disabled={todayRun.isLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-3 pr-14 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">МИН:С</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300" style={{ opacity: isTodayLocked ? 0.7 : 1 }}>
+                        {/* КАРТОЧКА ОТЖИМАНИЙ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300 relative" style={{ opacity: todayPushups.isLocked ? 0.7 : 1 }}>
+                            {todayPushups.isLocked && <div className="absolute top-4 right-4 text-green-500 bg-green-50 rounded-full p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div>}
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">💪</div>
                                 <div>
@@ -435,13 +454,15 @@
                                 </div>
                             </div>
                             <div className="flex items-center justify-between px-4">
-                                <button onClick={() => updatePushups(-1)} disabled={isTodayLocked} className="w-14 h-14 rounded-full bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-slate-500 text-3xl font-light active:scale-95 transition-transform">-</button>
-                                <span className={`text-5xl font-black tracking-tighter w-20 text-center ${isTodayLocked ? 'text-slate-400' : 'text-slate-800'}`}>{todayPushups}</span>
-                                <button onClick={() => updatePushups(+1)} disabled={isTodayLocked} className="w-14 h-14 rounded-full bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center text-white text-3xl font-light shadow-lg shadow-blue-600/30 disabled:shadow-none active:scale-95 transition-transform">+</button>
+                                <button onClick={() => updatePushups(-1)} disabled={todayPushups.isLocked} className="w-14 h-14 rounded-full bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-slate-500 text-3xl font-light active:scale-95 transition-transform">-</button>
+                                <span className={`text-5xl font-black tracking-tighter w-20 text-center ${todayPushups.isLocked ? 'text-slate-400' : 'text-slate-800'}`}>{todayPushups.count || 0}</span>
+                                <button onClick={() => updatePushups(+1)} disabled={todayPushups.isLocked} className="w-14 h-14 rounded-full bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center text-white text-3xl font-light shadow-lg shadow-blue-600/30 disabled:shadow-none active:scale-95 transition-transform">+</button>
                             </div>
                         </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300" style={{ opacity: isTodayLocked ? 0.7 : 1 }}>
+                        {/* КАРТОЧКА ГИБКОСТИ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300 relative" style={{ opacity: todayFlex.isLocked ? 0.7 : 1 }}>
+                            {todayFlex.isLocked && <div className="absolute top-1/2 -translate-y-1/2 right-32 text-green-500 bg-green-50 rounded-full p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div>}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl">🧘‍♂️</div>
@@ -451,13 +472,15 @@
                                     </div>
                                 </div>
                                 <div className="w-24 relative">
-                                    <input type="text" inputMode="decimal" placeholder="0" value={todayFlex} onChange={(e) => handleDailyInput('flex', 'cm', e.target.value)} disabled={isTodayLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-2 pr-8 pl-2 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                                    <input type="text" inputMode="decimal" placeholder="0" value={todayFlex.cm || ''} onChange={(e) => handleDailyInput('flex', 'cm', e.target.value)} disabled={todayFlex.isLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-2 pr-8 pl-2 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">СМ</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white p-5 rounded-3xl shadow-sm transition-opacity duration-300" style={{ opacity: isTodayLocked ? 0.7 : 1 }}>
+                        {/* КАРТОЧКА СПРИНТА */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm mb-6 transition-opacity duration-300 relative" style={{ opacity: todaySprint.isLocked ? 0.7 : 1 }}>
+                            {todaySprint.isLocked && <div className="absolute top-1/2 -translate-y-1/2 right-32 text-green-500 bg-green-50 rounded-full p-1"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg></div>}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl">⚡️</div>
@@ -467,18 +490,25 @@
                                     </div>
                                 </div>
                                 <div className="w-24 relative">
-                                    <input type="text" inputMode="decimal" placeholder="0.0" value={todaySprint} onChange={(e) => handleDailyInput('sprint', 'sec', e.target.value)} onBlur={validateSprint} disabled={isTodayLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-2 pr-6 pl-2 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+                                    <input type="text" inputMode="decimal" placeholder="0.0" value={todaySprint.sec || ''} onChange={(e) => handleDailyInput('sprint', 'sec', e.target.value)} onBlur={validateSprint} disabled={todaySprint.isLocked} className="w-full bg-slate-50 disabled:bg-transparent disabled:border-2 disabled:border-slate-100 text-right text-lg font-mono font-semibold text-blue-600 disabled:text-slate-500 rounded-xl py-2 pr-6 pl-2 focus:outline-none focus:ring-2 focus:ring-amber-200" />
                                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">С</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* КНОПКА ЗАПИСИ ИЛИ ПЛАШКА "ВЫПОЛНЕНО" */}
-                        {isTodayLocked ? (
+                        {/* УМНАЯ КНОПКА СОХРАНЕНИЯ */}
+                        {hasUnlockedData ? (
+                            <div className="pt-4">
+                                <button onClick={lockTodayTraining} className="w-full bg-blue-600 text-white font-black tracking-widest text-base py-5 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                                    ЗАПИСАТЬ НОВЫЕ РЕЗУЛЬТАТЫ
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                            </div>
+                        ) : hasLockedData ? (
                             <div className="bg-green-50 p-5 rounded-3xl text-center border border-green-100 shadow-sm mt-8">
                                 <div className="text-3xl mb-2">✅</div>
-                                <p className="text-base font-black text-green-800 uppercase tracking-widest">Тренировка сохранена</p>
-                                <p className="text-sm text-green-600 mt-1 font-medium">Отдыхай и возвращайся завтра!</p>
+                                <p className="text-base font-black text-green-800 uppercase tracking-widest">Часть тренировки сохранена</p>
+                                <p className="text-sm text-green-600 mt-1 font-medium">Остальные поля открыты для новых рекордов!</p>
                             </div>
                         ) : (
                             <div className="pt-4">
