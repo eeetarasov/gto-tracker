@@ -23,15 +23,21 @@
         input[type="number"]::-webkit-outer-spin-button { 
             -webkit-appearance: none; margin: 0; 
         }
+        @keyframes slideDown {
+            from { transform: translate(-50%, -120%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .animate-toast {
+            animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-200">
+<body class="bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-200 relative">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
-        // База нормативов ГТО
         const gtoData = [
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
@@ -122,7 +128,6 @@
             }
         };
 
-        // Хелпер для получения дат
         const getDateString = (date) => {
             const d = new Date(date);
             d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -130,16 +135,26 @@
         };
 
         const App = () => {
-            const [view, setView] = useState('training'); // Стартовый экран теперь Тренировка
+            const [view, setView] = useState('training'); 
             const [gender, setGender] = useState('М');
             const [inputs, setInputs] = useState({});
-            const [dailyData, setDailyData] = useState({}); // Хранилище ежедневных тренировок
+            const [dailyData, setDailyData] = useState({}); 
             const [userName, setUserName] = useState('Атлет');
             const [userId, setUserId] = useState(null);
             const [userPhoto, setUserPhoto] = useState(null);
             const [expandedCategories, setExpandedCategories] = useState({});
+            
+            // Состояние для Toast-уведомлений
+            const [toast, setToast] = useState(null);
+            const toastTimer = useRef(null);
 
             const todayStr = getDateString(new Date());
+
+            const showToast = (message) => {
+                if (toastTimer.current) clearTimeout(toastTimer.current);
+                setToast(message);
+                toastTimer.current = setTimeout(() => setToast(null), 4000);
+            };
 
             useEffect(() => {
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -158,26 +173,20 @@
                 }
             }, []);
 
-            // Загрузка данных ГТО и Тренировок
             useEffect(() => {
                 if (!userId) return;
-                
-                // Данные калькулятора
                 const savedGto = localStorage.getItem(`gto_${userId}_${gender}`);
                 if (savedGto) {
                     try { setInputs(JSON.parse(savedGto)); } catch (e) {}
                 } else {
                     setInputs({});
                 }
-                
-                // Данные тренировок
                 const savedDaily = localStorage.getItem(`gto_daily_${userId}`);
                 if (savedDaily) {
                     try { setDailyData(JSON.parse(savedDaily)); } catch (e) {}
                 } else {
                     setDailyData({});
                 }
-                
                 setExpandedCategories({});
             }, [userId, gender]);
 
@@ -194,15 +203,24 @@
                 }
             };
 
-            // Обновление ежедневных тренировок
+            // Логика с защитой от фрода (Anti-Cheat)
             const handleDailyInput = (exercise, field, val) => {
+                // Жесткие лимиты при вводе
+                if (field === 'km' && parseFloat(val) > 50) {
+                    showToast('Ультрамарафон на тренировке? Оставим это киборгам! 🏃‍♂️');
+                    return;
+                }
+                if (field === 'cm' && (parseFloat(val) > 40 || parseFloat(val) < -40)) {
+                    showToast('Твоей растяжке позавидует Человек-Паук! Но давай без магии. 🕷️');
+                    return;
+                }
+
                 const newDaily = { ...dailyData };
                 if (!newDaily[todayStr]) newDaily[todayStr] = {};
                 if (!newDaily[todayStr][exercise]) newDaily[todayStr][exercise] = {};
                 
                 newDaily[todayStr][exercise][field] = val;
                 
-                // Очистка пустых объектов
                 if (val === '' || val === 0) {
                     delete newDaily[todayStr][exercise][field];
                     if (Object.keys(newDaily[todayStr][exercise]).length === 0) delete newDaily[todayStr][exercise];
@@ -213,18 +231,46 @@
                 if (userId) localStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
             };
 
-            // Быстрый счетчик отжиманий
             const updatePushups = (delta) => {
                 const current = dailyData[todayStr]?.pushups?.count || 0;
                 const next = Math.max(0, current + delta);
+                
+                if (next > 200) {
+                    showToast('Киборг, помноженный на вечность? Вводи реальные цифры! 🤖');
+                    return;
+                }
+                
                 handleDailyInput('pushups', 'count', next);
+            };
+
+            // Проверки по факту потери фокуса (чтобы не мешать печатать)
+            const validateSprint = () => {
+                const val = parseFloat(dailyData[todayStr]?.sprint?.sec);
+                if (val > 0 && val < 6.0) {
+                    showToast('Полегче, Усейн Болт! Мировой рекорд 6.39с ⚡');
+                    handleDailyInput('sprint', 'sec', '');
+                }
+            };
+
+            const validateRun = () => {
+                const km = parseFloat(dailyData[todayStr]?.run?.km);
+                const timeStr = dailyData[todayStr]?.run?.time;
+                if (km > 0 && timeStr) {
+                    const timeSec = parseTime(timeStr, 'мин:с');
+                    if (timeSec > 0) {
+                        const speed = km / (timeSec / 3600); // Считаем км/ч
+                        if (speed > 25) {
+                            showToast('Эй, Флэш! С такой скоростью можно добежать до Вологды за пару часов 🏍️');
+                            handleDailyInput('run', 'time', ''); // Сбрасываем время
+                        }
+                    }
+                }
             };
 
             const toggleCategory = (cat) => {
                 setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
             };
 
-            // Вычисления для ГТО
             const currentData = useMemo(() => gtoData.filter(d => d.gender === gender), [gender]);
             const results = useMemo(() => {
                 return currentData.map(d => {
@@ -275,13 +321,10 @@
                 ];
             }, [bestResultsByCategory, inputs]);
 
-            // --- НОВЫЙ ЭКРАН: ТРЕНИРОВКА ---
             const renderTraining = () => {
-                // Вычисление Стрика
                 let currentStreak = 0;
                 let checkDate = new Date();
                 
-                // Если сегодня пусто, проверяем, не сгорел ли стрик вчера
                 if (!dailyData[getDateString(checkDate)]) {
                     checkDate.setDate(checkDate.getDate() - 1);
                 }
@@ -296,7 +339,6 @@
                     }
                 }
 
-                // Массив последних 7 дней для Heatmap
                 const last7Days = Array.from({length: 7}, (_, i) => {
                     const d = new Date();
                     d.setDate(d.getDate() - (6 - i));
@@ -310,9 +352,8 @@
                 const todaySprint = dailyData[todayStr]?.sprint?.sec || '';
 
                 return (
-                    <div className="px-4 space-y-6 pt-6">
+                    <div className="px-4 space-y-6 pt-6 mb-6">
                         
-                        {/* Heatmap & Стрик */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-50">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Активность</h3>
@@ -336,7 +377,6 @@
 
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 pt-2">Ежедневный трекинг</h2>
 
-                        {/* Карточка 1: БЕГ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">🏃‍♂️</div>
@@ -347,17 +387,16 @@
                             </div>
                             <div className="flex gap-3">
                                 <div className="w-1/2 relative">
-                                    <input type="text" inputMode="decimal" placeholder="0" value={todayRunDist} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <input type="text" inputMode="decimal" placeholder="0" value={todayRunDist} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} onBlur={validateRun} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">КМ</span>
                                 </div>
                                 <div className="w-1/2 relative">
-                                    <input type="text" inputMode="decimal" placeholder="00:00" value={todayRunTime} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-14 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <input type="text" inputMode="decimal" placeholder="00:00" value={todayRunTime} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} onBlur={validateRun} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-14 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">МИН:С</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Карточка 2: ОТЖИМАНИЯ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">💪</div>
@@ -373,7 +412,6 @@
                             </div>
                         </div>
 
-                        {/* Карточка 3: ГИБКОСТЬ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -390,7 +428,6 @@
                             </div>
                         </div>
 
-                        {/* Карточка 4: СПРИНТ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm mb-6">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -401,7 +438,7 @@
                                     </div>
                                 </div>
                                 <div className="w-24 relative">
-                                    <input type="text" inputMode="decimal" placeholder="0.0" value={todaySprint} onChange={(e) => handleDailyInput('sprint', 'sec', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-6 pl-2 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+                                    <input type="text" inputMode="decimal" placeholder="0.0" value={todaySprint} onChange={(e) => handleDailyInput('sprint', 'sec', e.target.value)} onBlur={validateSprint} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-6 pl-2 focus:outline-none focus:ring-2 focus:ring-amber-200" />
                                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">С</span>
                                 </div>
                             </div>
@@ -596,7 +633,7 @@
                 const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
 
                 return (
-                    <div className="px-4 space-y-6 pt-6 pb-6">
+                    <div className="px-4 space-y-6 pt-6 pb-6 mb-6">
                         <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
                             <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
                             <p className="text-3xl font-black">{badgeNames[finalBadge]}</p>
@@ -697,6 +734,14 @@
 
             return (
                 <div className="min-h-screen">
+                    {/* TOAST УВЕДОМЛЕНИЯ */}
+                    {toast && (
+                        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-11/12 max-w-sm bg-slate-800 text-white px-4 py-3 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 animate-toast">
+                            <div className="text-2xl">🚨</div>
+                            <p className="text-sm font-medium leading-tight">{toast}</p>
+                        </div>
+                    )}
+
                     <div className="bg-blue-600 text-white p-6 pb-12 rounded-b-[2.5rem] shadow-md relative overflow-hidden mb-[-2rem]">
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
@@ -736,7 +781,6 @@
                         {view === 'plan' && renderPlan()}
                     </div>
 
-                    {/* ОБНОВЛЕННАЯ ПАНЕЛЬ НАВИГАЦИИ НА 4 КНОПКИ */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-50">
                         <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
                             <button onClick={() => setView('training')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'training' ? 'text-blue-600' : 'text-slate-400'}`}>
