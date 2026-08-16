@@ -38,17 +38,13 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- УНИВЕРСАЛЬНЫЙ АДАПТЕР ХРАНИЛИЩА ---
         const AppStorage = {
             async getItem(key) {
                 return new Promise((resolve) => {
                     if (window.Telegram?.WebApp?.CloudStorage) {
                         window.Telegram.WebApp.CloudStorage.getItem(key, (err, val) => {
-                            if (!err && val) {
-                                resolve(val);
-                            } else {
-                                resolve(localStorage.getItem(key));
-                            }
+                            if (!err && val) resolve(val);
+                            else resolve(localStorage.getItem(key));
                         });
                     } else {
                         resolve(localStorage.getItem(key));
@@ -81,16 +77,11 @@
             }
         };
 
-        // --- HAPTIC FEEDBACK (ТАКТИЛЬНАЯ ОТДАЧА) ---
         const triggerHaptic = (type = 'impact', style = 'light') => {
             if (window.Telegram?.WebApp?.HapticFeedback) {
-                if (type === 'impact') {
-                    window.Telegram.WebApp.HapticFeedback.impactOccurred(style); // 'light', 'medium', 'heavy', 'rigid', 'soft'
-                } else if (type === 'notification') {
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred(style); // 'success', 'warning', 'error'
-                } else if (type === 'selection') {
-                    window.Telegram.WebApp.HapticFeedback.selectionChanged();
-                }
+                if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred(style);
+                else if (type === 'notification') window.Telegram.WebApp.HapticFeedback.notificationOccurred(style);
+                else if (type === 'selection') window.Telegram.WebApp.HapticFeedback.selectionChanged();
             }
         };
 
@@ -315,6 +306,15 @@
                 }
             };
 
+            const handleClearTraining = async () => {
+                triggerHaptic('impact', 'heavy');
+                if (window.confirm('Точно удалить всю историю тренировок и стрики? Это действие нельзя отменить.')) {
+                    setDailyData({});
+                    if (userId) await AppStorage.removeItem(`gto_daily_${userId}`);
+                    showToast('История тренировок очищена 🗑️');
+                }
+            };
+
             const lockTodayTraining = () => {
                 const todayData = dailyData[todayStr] || {};
                 let hasNew = false;
@@ -341,7 +341,7 @@
                 setDailyData(newDaily);
                 if (userId) AppStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
                 
-                triggerHaptic('notification', 'success'); // Победная вибрация
+                triggerHaptic('notification', 'success'); 
                 showToast('Новые результаты зафиксированы! 🎉');
             };
 
@@ -376,7 +376,7 @@
             const updatePushups = (delta) => {
                 if (dailyData[todayStr]?.pushups?.isLocked) return;
                 
-                triggerHaptic('impact', 'light'); // Легкая тактильная отдача при +/-
+                triggerHaptic('impact', 'light'); 
                 
                 const current = dailyData[todayStr]?.pushups?.count || 0;
                 const next = Math.max(0, current + delta);
@@ -608,6 +608,13 @@
                             </div>
                         )}
 
+                        {/* КНОПКА СБРОСА ТРЕНИРОВОК */}
+                        <div className="mt-8 mb-4 text-center">
+                            <button onClick={handleClearTraining} className="text-[10px] font-bold text-slate-300 hover:text-red-400 transition-colors uppercase tracking-widest px-4 py-2">
+                                Сбросить историю тренировок
+                            </button>
+                        </div>
+
                     </div>
                 );
             };
@@ -759,10 +766,11 @@
             };
 
             const renderDashboard = () => {
+                // АЧИВКИ (Достижения)
                 const achievements = [
                     { 
                         id: 'first', icon: '🥉', title: 'Первый шаг', 
-                        desc: 'Сохранить 1 тренировку', 
+                        desc: '1 сохраненная тренировка', 
                         isUnlocked: userStats.totalTrainings >= 1 
                     },
                     { 
@@ -777,7 +785,7 @@
                     },
                     { 
                         id: 'marathon', icon: '🏃‍♂️', title: 'Марафонец', 
-                        desc: 'Суммарно пробежать 42.2 км', 
+                        desc: 'Пробежать 42.2 км', 
                         isUnlocked: userStats.totalKm >= 42.2 
                     }
                 ];
