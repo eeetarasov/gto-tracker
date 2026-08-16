@@ -66,12 +66,8 @@
         ];
 
         const gtoQuotaData = {
-          'М_10': {
-            'gold': 6, 'silver': 5, 'bronze': 5 
-          },
-          'Ж_9': {
-            'gold': 6, 'silver': 5, 'bronze': 5
-          }
+          'М_10': { 'gold': 6, 'silver': 5, 'bronze': 5 },
+          'Ж_9': { 'gold': 6, 'silver': 5, 'bronze': 5 }
         };
 
         const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
@@ -263,7 +259,8 @@
                 const types = ['Обязательное', 'По выбору'];
 
                 return (
-                    <div className="px-4 space-y-8 pt-6"> 
+                    // Увеличен верхний отступ (pt-10) для отделения заголовка от синего фона
+                    <div className="px-4 space-y-8 pt-10"> 
                         {types.map(type => {
                             const typeData = currentData.filter(d => d.type === type);
                             if (typeData.length === 0) return null;
@@ -272,7 +269,7 @@
                             
                             return (
                                 <div key={type} className="space-y-4">
-                                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">
+                                    <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 drop-shadow-sm">
                                         {type === 'Обязательное' ? 'Обязательные испытания' : 'Испытания по выбору'}
                                     </h2>
                                     
@@ -472,7 +469,7 @@
                 const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
 
                 return (
-                    <div className="px-4 space-y-6">
+                    <div className="px-4 space-y-6 pt-6">
                         
                         <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
                             <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
@@ -558,7 +555,7 @@
                 };
 
                 return (
-                    <div className="px-4 space-y-4">
+                    <div className="px-4 space-y-4 pt-6">
                         {weakCategories.map(cat => (
                             <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
                                 <div className="flex items-center justify-between mb-3">
@@ -578,40 +575,43 @@
                         <div className="absolute inset-0 lace-pattern opacity-30"></div>
                         <div className="relative z-10">
                             
-                            <div className="flex items-center gap-3 mb-4">
+                            <div className="flex items-center gap-3 mb-6">
                                 <img 
                                     src="logo.png?v=2" 
                                     alt="ГТО" 
                                     className="h-10 w-auto object-contain drop-shadow-sm"
                                 />
-                                <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-sm">PRO_TRACKER</h1>
+                                <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-sm">ТРЕКЕР</h1>
                             </div>
                             
-                            {/* ОБНОВЛЕННЫЙ БЛОК ПРИВЕТСТВИЯ С АВАТАРКОЙ */}
-                            <div className="flex items-center gap-3">
-                                {userPhoto ? (
-                                    <img 
-                                        src={userPhoto} 
-                                        alt="Аватар" 
-                                        className="w-10 h-10 rounded-full border-2 border-white/20 object-cover shadow-sm" 
-                                    />
-                                ) : (
-                                    <div className="w-10 h-10 rounded-full bg-blue-500/50 flex items-center justify-center text-white font-bold border-2 border-white/20 shadow-sm">
-                                        {userName.charAt(0)}
+                            {/* СГРУППИРОВАННАЯ КАРТОЧКА ПРОФИЛЯ */}
+                            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    {userPhoto ? (
+                                        <img 
+                                            src={userPhoto} 
+                                            alt="Аватар" 
+                                            className="w-11 h-11 rounded-full border-2 border-white/30 object-cover shadow-sm" 
+                                        />
+                                    ) : (
+                                        <div className="w-11 h-11 rounded-full bg-blue-500/80 flex items-center justify-center text-white text-lg font-bold border-2 border-white/30 shadow-sm">
+                                            {userName.charAt(0)}
+                                        </div>
+                                    )}
+                                    <p className="text-white font-medium text-sm leading-tight drop-shadow-sm">
+                                        Привет, {userName}!<br/>
+                                        <span className="opacity-80 text-xs font-normal">Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</span>
+                                    </p>
+                                </div>
+                                
+                                {view === 'calculator' && (
+                                    <div className="flex bg-blue-900/40 p-1 rounded-full w-32 shadow-inner border border-white/10">
+                                        <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Муж</button>
+                                        <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Жен</button>
                                     </div>
                                 )}
-                                <p className="text-blue-200 font-medium text-sm leading-tight">
-                                    Привет, {userName}!<br/>
-                                    <span className="opacity-70 text-xs">Ступень {gender === 'М' ? '10 (Муж)' : '9 (Жен)'}</span>
-                                </p>
                             </div>
                             
-                            {view === 'calculator' && (
-                                <div className="mt-5 flex bg-blue-700/50 p-1 rounded-full w-48 backdrop-blur-sm border border-blue-500/30">
-                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Муж</button>
-                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-sm font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100'}`}>Жен</button>
-                                </div>
-                            )}
                         </div>
                     </div>
 
