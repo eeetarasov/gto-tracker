@@ -249,7 +249,6 @@
                 loadAllData();
             }, [userId, gender]);
 
-            // Вычисляем текущий стрик глобально, чтобы использовать в ачивках
             const currentStreak = useMemo(() => {
                 let streak = 0;
                 let checkDate = new Date();
@@ -271,7 +270,6 @@
                 return streak;
             }, [dailyData]);
 
-            // Вычисляем статистику для ачивок
             const userStats = useMemo(() => {
                 let maxPushups = 0;
                 let totalKm = 0;
@@ -300,7 +298,7 @@
 
             const handleClear = async () => {
                 triggerHaptic('impact', 'medium');
-                if (window.confirm('Точно очистить все введенные результаты ГТО?')) {
+                if (window.confirm('Точно очистить все введенные результаты калькулятора?')) {
                     setInputs({});
                     if (userId) await AppStorage.removeItem(`gto_${userId}_${gender}`);
                 }
@@ -619,11 +617,76 @@
                 );
             };
 
+            const renderRadarChart = () => {
+                const size = 320;
+                const center = size / 2;
+                const maxRadius = 100;
+                
+                const points = radarData.map((d, i) => {
+                    const angle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+                    const r = (d.val / 100) * maxRadius;
+                    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), labelX: center + (maxRadius + 30) * Math.cos(angle), labelY: center + (maxRadius + 22) * Math.sin(angle), label: d.subject };
+                });
+
+                const userPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ') + ' Z';
+                
+                const renderPolygon = (level) => {
+                    const r = (level / 100) * maxRadius;
+                    const pts = [0,1,2,3,4].map(i => {
+                        const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+                        return `${center + r * Math.cos(a)},${center + r * Math.sin(a)}`;
+                    }).join(' L ') + ' Z';
+                    return <path d={`M ${pts}`} fill="none" stroke={level === 100 ? '#cbd5e1' : '#f1f5f9'} strokeWidth={level === 100 ? 2 : 1} strokeDasharray={level !== 100 ? "4,4" : "none"} />;
+                };
+
+                return (
+                    <div className="bg-white p-5 rounded-3xl shadow-sm flex flex-col items-center overflow-hidden">
+                        <h3 className="text-lg font-bold text-slate-800 w-full mb-4 flex items-center">
+                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002-2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            Профиль атлета
+                        </h3>
+                        <div className="relative w-full max-w-[320px] aspect-square">
+                            <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible drop-shadow-sm">
+                                {renderPolygon(50)}
+                                {renderPolygon(150)}
+                                {[0,1,2,3,4].map(i => {
+                                    const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+                                    return <line key={i} x1={center} y1={center} x2={center + 1.5 * maxRadius * Math.cos(a)} y2={center + 1.5 * maxRadius * Math.sin(a)} stroke="#f1f5f9" strokeWidth="1" />;
+                                })}
+                                <path d={`M ${[0,1,2,3,4].map(i => {
+                                    const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+                                    return `${center + maxRadius * Math.cos(a)},${center + maxRadius * Math.sin(a)}`;
+                                }).join(' L ')} Z`} fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" opacity="0.4"/>
+                                <path d={userPath} fill="rgba(37, 99, 235, 0.15)" stroke="#2563eb" strokeWidth="3" strokeLinejoin="round" />
+                                {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke="#2563eb" strokeWidth="2" />)}
+                                {points.map((p, i) => <text key={i} x={p.labelX} y={p.labelY} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-widest">{p.label}</text>)}
+                            </svg>
+                        </div>
+                        <div className="flex justify-center items-center gap-5 mt-4">
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-slate-400 bg-slate-50"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Золото (100%)</span></div>
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-600/20 border-2 border-blue-600"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Твой результат</span></div>
+                        </div>
+                    </div>
+                );
+            };
+
             const renderCalculator = () => {
                 const types = ['Обязательное', 'По выбору'];
 
+                // Вычисляем данные статуса для калькулятора (если есть результаты)
+                const currentKey = `${gender}_${gender === 'М' ? 10 : 9}`;
+                const currentQuotas = gtoQuotaData[currentKey] || gtoQuotaData['М_10']; 
+                const mandatoryCategories = [...new Set(currentData.filter(d => d.type === 'Обязательное').map(d => d.category))];
+                const reqMandatory = mandatoryCategories.length;
+                const reqOptionalGold = currentQuotas.gold - reqMandatory;
+                const reqOptionalSilver = currentQuotas.silver - reqMandatory;
+                const executedMandatoryCount = mandatoryCategories.filter(cat => bestResultsByCategory.some(r => r.category === cat)).length;
+                const executedOptionalCount = bestResultsByCategory.length - executedMandatoryCount;
+                const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
+
                 return (
-                    <div className="px-4 space-y-8 pt-10"> 
+                    <div className="px-4 space-y-8 pt-10 pb-6"> 
+                        
                         {types.map(type => {
                             const typeData = currentData.filter(d => d.type === type);
                             if (typeData.length === 0) return null;
@@ -699,73 +762,74 @@
                                 </div>
                             );
                         })}
+
+                        {/* Аналитика перенесена в Калькулятор */}
+                        {results.length > 0 && (
+                            <div className="space-y-6 mt-8">
+                                {renderRadarChart()}
+
+                                <div className="bg-white p-5 rounded-3xl shadow-sm">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                        <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                        Выполнение минимумов ГТО
+                                    </h3>
+                                    <div className="space-y-4 text-sm">
+                                        <div className="flex justify-between items-center border-b border-slate-50 pb-3">
+                                            <p className="text-slate-700 w-2/3 leading-tight">Обязательных качеств</p>
+                                            <div className="text-right w-1/3">
+                                                <p className="text-xl font-bold text-slate-900">
+                                                    <span className={executedMandatoryCount >= reqMandatory ? 'text-green-600' : 'text-red-600'}>{executedMandatoryCount}</span> <span className="text-xs font-medium text-slate-400">из {reqMandatory}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center pb-1">
+                                            <p className="text-slate-700 w-2/3 leading-tight">Качеств по выбору</p>
+                                            <div className="text-right w-1/3">
+                                                <p className="text-xl font-bold text-slate-900">
+                                                    <span className={executedOptionalCount >= reqOptionalSilver ? 'text-green-600' : 'text-red-600'}>{executedOptionalCount}</span> <span className="text-xs font-medium text-slate-400">из {reqOptionalGold}</span>
+                                                </p>
+                                                <p className="text-[9px] text-slate-400 mt-0.5 leading-none">мин. {reqOptionalSilver} для сер/бронз</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {worstExecutedBadge !== 'gold' && (
+                                    <div className="bg-white p-5 rounded-3xl shadow-sm">
+                                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                            Ближайшие цели
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {bestResultsByCategory.filter(r => r.result.badge !== 'gold').map(d => (
+                                                <div key={d.name} className="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                                                    <p className="text-sm font-medium text-slate-700 w-1/2 pr-2 leading-tight">{d.name}</p>
+                                                    <div className="text-right">
+                                                        <p className={`text-[10px] uppercase font-bold tracking-wider ${{'gold': 'text-yellow-600', 'silver': 'text-slate-500', 'bronze': 'text-orange-600'}[d.result.nextBadge]}`}>
+                                                            Цель: {badgeNames[d.result.nextBadge]}
+                                                        </p>
+                                                        <p className="text-sm font-mono font-bold text-slate-900 whitespace-nowrap mt-0.5">
+                                                            осталось <span className="text-blue-600">{formatGap(d.result.gap, d.unit)}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
-                        <div className="flex gap-3 pt-4 mb-6">
-                            <button onClick={() => switchView('dashboard')} className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform">
-                                РАССЧИТАТЬ
-                            </button>
-                            <button onClick={handleClear} className="w-1/3 bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center">
-                                ОЧИСТИТЬ
+                        <div className="flex gap-3 pt-4">
+                            <button onClick={handleClear} className="w-full bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center">
+                                ОЧИСТИТЬ ВСЕ ДАННЫЕ КАЛЬКУЛЯТОРА
                             </button>
                         </div>
                     </div>
                 );
             };
 
-            const renderRadarChart = () => {
-                const size = 320;
-                const center = size / 2;
-                const maxRadius = 100;
-                
-                const points = radarData.map((d, i) => {
-                    const angle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
-                    const r = (d.val / 100) * maxRadius;
-                    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), labelX: center + (maxRadius + 30) * Math.cos(angle), labelY: center + (maxRadius + 22) * Math.sin(angle), label: d.subject };
-                });
-
-                const userPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ') + ' Z';
-                
-                const renderPolygon = (level) => {
-                    const r = (level / 100) * maxRadius;
-                    const pts = [0,1,2,3,4].map(i => {
-                        const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
-                        return `${center + r * Math.cos(a)},${center + r * Math.sin(a)}`;
-                    }).join(' L ') + ' Z';
-                    return <path d={`M ${pts}`} fill="none" stroke={level === 100 ? '#cbd5e1' : '#f1f5f9'} strokeWidth={level === 100 ? 2 : 1} strokeDasharray={level !== 100 ? "4,4" : "none"} />;
-                };
-
-                return (
-                    <div className="bg-white p-5 rounded-3xl shadow-sm flex flex-col items-center overflow-hidden">
-                        <h3 className="text-lg font-bold text-slate-800 w-full mb-4 flex items-center">
-                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002-2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                            Профиль атлета
-                        </h3>
-                        <div className="relative w-full max-w-[320px] aspect-square">
-                            <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible drop-shadow-sm">
-                                {renderPolygon(50)}
-                                {renderPolygon(150)}
-                                {[0,1,2,3,4].map(i => {
-                                    const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
-                                    return <line key={i} x1={center} y1={center} x2={center + 1.5 * maxRadius * Math.cos(a)} y2={center + 1.5 * maxRadius * Math.sin(a)} stroke="#f1f5f9" strokeWidth="1" />;
-                                })}
-                                <path d={`M ${[0,1,2,3,4].map(i => {
-                                    const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
-                                    return `${center + maxRadius * Math.cos(a)},${center + maxRadius * Math.sin(a)}`;
-                                }).join(' L ')} Z`} fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" opacity="0.4"/>
-                                <path d={userPath} fill="rgba(37, 99, 235, 0.15)" stroke="#2563eb" strokeWidth="3" strokeLinejoin="round" />
-                                {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke="#2563eb" strokeWidth="2" />)}
-                                {points.map((p, i) => <text key={i} x={p.labelX} y={p.labelY} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-widest">{p.label}</text>)}
-                            </svg>
-                        </div>
-                        <div className="flex justify-center items-center gap-5 mt-4">
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-slate-400 bg-slate-50"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Золото (100%)</span></div>
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-600/20 border-2 border-blue-600"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Твой результат</span></div>
-                        </div>
-                    </div>
-                );
-            };
-
-            const renderDashboard = () => {
+            const renderProfile = () => {
                 // АЧИВКИ (Достижения)
                 const achievements = [
                     { 
@@ -801,7 +865,6 @@
 
                 const currentKey = `${gender}_${gender === 'М' ? 10 : 9}`;
                 const currentQuotas = gtoQuotaData[currentKey] || gtoQuotaData['М_10']; 
-                
                 const mandatoryCategories = [...new Set(currentData.filter(d => d.type === 'Обязательное').map(d => d.category))];
                 const reqMandatory = mandatoryCategories.length;
                 const reqOptionalGold = currentQuotas.gold - reqMandatory;
@@ -835,8 +898,6 @@
                             {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по категориям не выполнены</p>}
                         </div>
 
-                        {renderRadarChart()}
-
                         {/* ВИТРИНА ДОСТИЖЕНИЙ */}
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
@@ -856,32 +917,6 @@
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-5 rounded-3xl shadow-sm">
-                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                Выполнение минимумов ГТО
-                            </h3>
-                            <div className="space-y-4 text-sm">
-                                <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                                    <p className="text-slate-700 w-2/3 leading-tight">Обязательных качеств</p>
-                                    <div className="text-right w-1/3">
-                                        <p className="text-xl font-bold text-slate-900">
-                                            <span className={executedMandatoryCount >= reqMandatory ? 'text-green-600' : 'text-red-600'}>{executedMandatoryCount}</span> <span className="text-xs font-medium text-slate-400">из {reqMandatory}</span>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center pb-1">
-                                    <p className="text-slate-700 w-2/3 leading-tight">Качеств по выбору</p>
-                                    <div className="text-right w-1/3">
-                                        <p className="text-xl font-bold text-slate-900">
-                                            <span className={executedOptionalCount >= reqOptionalSilver ? 'text-green-600' : 'text-red-600'}>{executedOptionalCount}</span> <span className="text-xs font-medium text-slate-400">из {reqOptionalGold}</span>
-                                        </p>
-                                        <p className="text-[9px] text-slate-400 mt-0.5 leading-none">мин. {reqOptionalSilver} для сер/бронз</p>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -974,7 +1009,7 @@
                     <div className="relative z-20 mt-4">
                         {view === 'training' && renderTraining()}
                         {view === 'calculator' && renderCalculator()}
-                        {view === 'dashboard' && renderDashboard()}
+                        {view === 'profile' && renderProfile()}
                         {view === 'plan' && renderPlan()}
                     </div>
 
@@ -988,9 +1023,9 @@
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                                 <span className="text-[10px] font-bold">Калькулятор</span>
                             </button>
-                            <button onClick={() => switchView('dashboard')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => switchView('profile')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'profile' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                <span className="text-[10px] font-bold">Анализ</span>
+                                <span className="text-[10px] font-bold">Профиль</span>
                             </button>
                             <button onClick={() => switchView('plan')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
