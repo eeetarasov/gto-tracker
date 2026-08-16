@@ -57,12 +57,55 @@
 
             const switchView = (v) => { window.triggerHaptic('selection'); setView(v); };
 
-            const renderTraining = () => (
-                <div className="p-4 text-center text-slate-500">
-                    <h2 className="text-xl font-black text-slate-800 mb-4">Тренировка</h2>
-                    <p>Тут функционал ежедневного трекинга...</p>
+            const renderTraining = () => {
+    const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
+    const todayData = dailyData[todayStr] || {};
+    const hasUnlockedData = Object.keys(todayData).some(ex => {
+        const exData = todayData[ex];
+        return !exData.isLocked && Object.keys(exData).some(k => k !== 'isLocked' && exData[k] !== '' && exData[k] !== 0);
+    });
+    const hasLockedData = Object.values(todayData).some(ex => ex.isLocked);
+
+    return (
+        <div className="px-4 space-y-6 pt-6 pb-6 mb-6">
+            <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Ежедневный трекинг</h2>
+            
+            {/* Карточка бега */}
+            <div className="bg-white p-5 rounded-3xl shadow-sm relative" style={{ opacity: dailyData[todayStr]?.run?.isLocked ? 0.7 : 1 }}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">🏃‍♂️</div>
+                    <div><h3 className="font-bold text-slate-800">Бег</h3></div>
                 </div>
-            );
+                <div className="flex gap-3">
+                    <input type="text" placeholder="КМ" value={dailyData[todayStr]?.run?.km || ''} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} disabled={dailyData[todayStr]?.run?.isLocked} className="w-full bg-slate-50 p-3 rounded-xl text-right font-mono text-blue-600" />
+                    <input type="text" placeholder="МИН:С" value={dailyData[todayStr]?.run?.time || ''} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} disabled={dailyData[todayStr]?.run?.isLocked} className="w-full bg-slate-50 p-3 rounded-xl text-right font-mono text-blue-600" />
+                </div>
+            </div>
+
+            {/* Карточка отжиманий */}
+            <div className="bg-white p-5 rounded-3xl shadow-sm relative" style={{ opacity: dailyData[todayStr]?.pushups?.isLocked ? 0.7 : 1 }}>
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">💪</div>
+                    <div><h3 className="font-bold text-slate-800">Отжимания</h3></div>
+                </div>
+                <div className="flex items-center justify-between px-4">
+                    <button onClick={() => updatePushups(-1)} disabled={dailyData[todayStr]?.pushups?.isLocked} className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">-</button>
+                    <span className="text-3xl font-black">{dailyData[todayStr]?.pushups?.count || 0}</span>
+                    <button onClick={() => updatePushups(1)} disabled={dailyData[todayStr]?.pushups?.isLocked} className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center">+</button>
+                </div>
+            </div>
+
+            {/* Кнопка записи */}
+            {hasUnlockedData && (
+                <button onClick={lockTodayTraining} className="w-full bg-blue-600 text-white font-black p-5 rounded-3xl shadow-lg">ЗАПИСАТЬ НОВЫЕ РЕЗУЛЬТАТЫ</button>
+            )}
+            
+            <div className="text-center">
+                <button onClick={handleClearTraining} className="text-[10px] text-slate-300 uppercase tracking-widest p-2">Сбросить историю</button>
+            </div>
+        </div>
+    );
+};
 
             const renderCalculator = () => (
                 <div className="p-4 text-center text-slate-500">
