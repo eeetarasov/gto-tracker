@@ -4,530 +4,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ГТО PRO_TRACKER</title>
-    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
+    <script src="storage.js"></script>
+    <script src="data.js"></script>
     <style>
-        .lace-pattern {
-            background-image: 
-                radial-gradient(circle at center, rgba(255,255,255,0.15) 2px, transparent 2.5px),
-                radial-gradient(circle at center, rgba(255,255,255,0.1) 1px, transparent 1.5px);
-            background-size: 24px 24px, 12px 12px;
-            background-position: 0 0, 12px 12px;
-        }
-        input[type="number"]::-webkit-inner-spin-button, 
-        input[type="number"]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; margin: 0; 
-        }
-        @keyframes slideDown {
-            from { transform: translate(-50%, -120%); opacity: 0; }
-            to { transform: translate(-50%, 0); opacity: 1; }
-        }
-        .animate-toast {
-            animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
+        .lace-pattern { background-image: radial-gradient(circle at center, rgba(255,255,255,0.15) 2px, transparent 2.5px), radial-gradient(circle at center, rgba(255,255,255,0.1) 1px, transparent 1.5px); background-size: 24px 24px, 12px 12px; background-position: 0 0, 12px 12px; }
+        .animate-toast { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideDown { from { transform: translate(-50%, -120%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-200 relative">
+<body class="bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-blue-200">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ... (AppStorage, gtoData, gtoQuotaData, функции расчета остаются без изменений)
-        const AppStorage = {
-            async getItem(key) {
-                return new Promise((resolve) => {
-                    if (window.Telegram?.WebApp?.CloudStorage) {
-                        window.Telegram.WebApp.CloudStorage.getItem(key, (err, val) => {
-                            if (!err && val) resolve(val);
-                            else resolve(localStorage.getItem(key));
-                        });
-                    } else {
-                        resolve(localStorage.getItem(key));
-                    }
-                });
-            },
-            async setItem(key, value) {
-                return new Promise((resolve) => {
-                    localStorage.setItem(key, value);
-                    if (window.Telegram?.WebApp?.CloudStorage) {
-                        window.Telegram.WebApp.CloudStorage.setItem(key, value, (err, success) => {
-                            resolve(success);
-                        });
-                    } else {
-                        resolve(true);
-                    }
-                });
-            },
-            async removeItem(key) {
-                return new Promise((resolve) => {
-                    localStorage.removeItem(key);
-                    if (window.Telegram?.WebApp?.CloudStorage) {
-                        window.Telegram.WebApp.CloudStorage.removeItem(key, (err, success) => {
-                            resolve(success);
-                        });
-                    } else {
-                        resolve(true);
-                    }
-                });
-            }
-        };
-
-        const triggerHaptic = (type = 'impact', style = 'light') => {
-            if (window.Telegram?.WebApp?.HapticFeedback) {
-                if (type === 'impact') window.Telegram.WebApp.HapticFeedback.impactOccurred(style);
-                else if (type === 'notification') window.Telegram.WebApp.HapticFeedback.notificationOccurred(style);
-                else if (type === 'selection') window.Telegram.WebApp.HapticFeedback.selectionChanged();
-            }
-        };
-
-        const gtoData = [
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 5 км', unit: 'мин:с', gold: '22:30', silver: '26:00', bronze: '28:30' },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 1000 м', unit: 'мин:с', gold: '3:45', silver: '4:06', bronze: '5:02' },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на лыжах на 5 км', unit: 'мин:с', gold: '23:00', silver: '26:30', bronze: '29:30' },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед (см)', unit: 'см', gold: 11, silver: 5, bronze: 3 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на высокой перекладине', unit: 'раз', gold: 13, silver: 8, bronze: 4 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 33, silver: 19, bronze: 15 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Рывок гири 16 кг', unit: 'раз', gold: 40, silver: 22, bronze: 18 },
-            { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 23, silver: 15, bronze: 10 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Прыжок в длину с места', unit: 'см', gold: 234, silver: 213, bronze: 197 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Поднимание туловища за 1 мин', unit: 'раз', gold: 42, silver: 32, bronze: 25 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Метание спортивного снаряда 700 г', unit: 'м', gold: 35, silver: 30, bronze: 26 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Плавание на 50 м', unit: 'мин:с', gold: '0:55', silver: '1:05', bronze: '1:22' },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (открытый прицел)', unit: 'очки', gold: 25, silver: 20, bronze: 15 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (электронное оружие)', unit: 'очки', gold: 30, silver: 25, bronze: 18 },
-            { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Туристский поход', unit: 'навыков', gold: 7, silver: 5, bronze: 3 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 100 м', unit: 'с', gold: 16.7, silver: 17.9, bronze: 19.1 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 1000 м', unit: 'мин:с', gold: '4:20', silver: '4:40', bronze: '5:10' },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 2000 м', unit: 'мин:с', gold: '11:15', silver: '12:50', bronze: '14:20' },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 3 км', unit: 'мин:с', gold: '17:40', silver: '19:50', bronze: '22:30' },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на лыжах на 3 км', unit: 'мин:с', gold: '18:10', silver: '20:20', bronze: '23:00' },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Гибкость', name: 'Наклон вперед (см)', unit: 'см', gold: 14, silver: 9, bronze: 7 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 17, silver: 12, bronze: 8 },
-            { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
-        ];
-
-        const gtoQuotaData = { 'М_10': { 'gold': 6, 'silver': 5, 'bronze': 5 }, 'Ж_9': { 'gold': 6, 'silver': 5, 'bronze': 5 } };
-        const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
-
-        const getPlural = (num) => {
-            if (num % 10 === 1 && num % 100 !== 11) return 'состязание';
-            if ([2, 3, 4].includes(num % 10) && ![12, 13, 14].includes(num % 100)) return 'состязания';
-            return 'состязаний';
-        };
-
-        const parseTime = (val, unit) => {
-            if (!val) return null;
-            if (typeof val === 'number') return val;
-            val = val.toString().replace(',', '.');
-            if (val.includes(':')) {
-                const parts = val.split(':');
-                return parseInt(parts[0] || 0) * 60 + parseFloat(parts[1] || 0);
-            }
-            const floatVal = parseFloat(val);
-            return unit === 'мин:с' ? floatVal * 60 : floatVal;
-        };
-
-        const formatGap = (gap, unit) => {
-            if (unit === 'мин:с') {
-                const m = Math.floor(gap / 60);
-                const s = Math.floor(gap % 60);
-                return m > 0 ? `${m} мин ${s} с` : `${s} с`;
-            }
-            return `${Math.round(gap * 10) / 10} ${unit}`;
-        };
-
-        const calculatePercentage = (discipline, inputValue) => {
-            if (!inputValue) return 0;
-            const val = parseTime(inputValue, discipline.unit);
-            const g = parseTime(discipline.gold, discipline.unit);
-            if (!val || !g) return 0;
-            const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
-            let pct = isTime ? (g / val) * 100 : (val / g) * 100;
-            return Math.min(pct, 150); 
-        };
-
-        const calculateResult = (discipline, inputValue) => {
-            if (!inputValue) return null;
-            const val = parseTime(inputValue, discipline.unit);
-            const g = parseTime(discipline.gold, discipline.unit);
-            const s = parseTime(discipline.silver, discipline.unit);
-            const b = parseTime(discipline.bronze, discipline.unit);
-            const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
-
-            if (isTime) {
-                if (val <= g) return { badge: 'gold', nextBadge: null, gap: 0 };
-                if (val <= s) return { badge: 'silver', nextBadge: 'gold', gap: val - g };
-                if (val <= b) return { badge: 'bronze', nextBadge: 'silver', gap: val - s };
-                return { badge: 'none', nextBadge: 'bronze', gap: val - b };
-            } else {
-                if (val >= g) return { badge: 'gold', nextBadge: null, gap: 0 };
-                if (val >= s) return { badge: 'silver', nextBadge: 'gold', gap: g - val };
-                if (val >= b) return { badge: 'bronze', nextBadge: 'silver', gap: s - val };
-                return { badge: 'none', nextBadge: 'bronze', gap: b - val };
-            }
-        };
-
-        const getDateString = (date) => {
-            const d = new Date(date);
-            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-            return d.toISOString().split('T')[0];
-        };
-
         const App = () => {
-            const [view, setView] = useState('training'); 
+            const [view, setView] = useState('training');
             const [gender, setGender] = useState('М');
             const [inputs, setInputs] = useState({});
-            const [dailyData, setDailyData] = useState({}); 
+            const [dailyData, setDailyData] = useState({});
             const [userName, setUserName] = useState('Атлет');
             const [userId, setUserId] = useState(null);
             const [userPhoto, setUserPhoto] = useState(null);
-            const [expandedCategories, setExpandedCategories] = useState({});
-            const [isLoaded, setIsLoaded] = useState(false); 
-            
             const [toast, setToast] = useState(null);
-            const toastTimer = useRef(null);
 
-            const todayStr = getDateString(new Date());
-
-            const switchView = (newView) => {
-                triggerHaptic('selection');
-                setView(newView);
-            };
-
-            const showToast = (message, isError = false) => {
-                if (toastTimer.current) clearTimeout(toastTimer.current);
-                setToast(message);
-                if (isError) triggerHaptic('notification', 'error');
-                toastTimer.current = setTimeout(() => setToast(null), 4000);
-            };
+            const todayStr = new Date().toISOString().split('T')[0];
 
             useEffect(() => {
-                if (window.Telegram && window.Telegram.WebApp) {
+                if (window.Telegram?.WebApp) {
                     window.Telegram.WebApp.ready();
                     window.Telegram.WebApp.expand();
                     const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
                     if (tgUser) {
                         setUserName(tgUser.first_name);
                         setUserId(tgUser.id.toString());
-                        if (tgUser.photo_url) setUserPhoto(tgUser.photo_url);
-                    } else {
-                        setUserId('guest');
+                        setUserPhoto(tgUser.photo_url || null);
                     }
-                } else {
-                    setUserId('guest');
                 }
-            }, []);
-
-            useEffect(() => {
-                if (!userId) return;
-                const loadAllData = async () => {
-                    const savedGto = await AppStorage.getItem(`gto_${userId}_${gender}`);
-                    if (savedGto) {
-                        try { setInputs(JSON.parse(savedGto)); } catch (e) { setInputs({}); }
-                    } else {
-                        setInputs({});
-                    }
-
-                    const savedDaily = await AppStorage.getItem(`gto_daily_${userId}`);
-                    if (savedDaily) {
-                        try { setDailyData(JSON.parse(savedDaily)); } catch (e) { setDailyData({}); }
-                    } else {
-                        setDailyData({});
-                    }
-                    
-                    setIsLoaded(true);
-                    setExpandedCategories({});
+                const load = async () => {
+                    const g = await window.AppStorage.getItem(`gto_${userId}_${gender}`);
+                    const d = await window.AppStorage.getItem(`gto_daily_${userId}`);
+                    if (g) setInputs(JSON.parse(g));
+                    if (d) setDailyData(JSON.parse(d));
                 };
-                loadAllData();
+                if (userId) load();
             }, [userId, gender]);
 
-            const currentStreak = useMemo(() => {
-                let streak = 0;
-                let checkDate = new Date();
-                const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
+            const switchView = (v) => { window.triggerHaptic('selection'); setView(v); };
 
-                if (!isDayLocked(getDateString(checkDate))) {
-                    checkDate.setDate(checkDate.getDate() - 1);
-                }
+            const renderTraining = () => (
+                <div className="p-4 text-center text-slate-500">
+                    <h2 className="text-xl font-black text-slate-800 mb-4">Тренировка</h2>
+                    <p>Тут функционал ежедневного трекинга...</p>
+                </div>
+            );
 
-                while (true) {
-                    const dStr = getDateString(checkDate);
-                    if (isDayLocked(dStr)) {
-                        streak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else {
-                        break;
-                    }
-                }
-                return streak;
-            }, [dailyData]);
+            const renderCalculator = () => (
+                <div className="p-4 text-center text-slate-500">
+                    <h2 className="text-xl font-black text-slate-800 mb-4">Калькулятор</h2>
+                    <p>Тут радар и расчеты ГТО...</p>
+                </div>
+            );
 
-            const userStats = useMemo(() => {
-                let maxPushups = 0;
-                let totalKm = 0;
-                let totalTrainings = 0;
+            const renderProfile = () => (
+                <div className="p-4 text-center text-slate-500">
+                    <h2 className="text-xl font-black text-slate-800 mb-4">Профиль</h2>
+                    <p>Тут витрина ачивок и статистика...</p>
+                </div>
+            );
 
-                Object.values(dailyData).forEach(day => {
-                    const hasLockedEx = Object.values(day).some(ex => ex?.isLocked);
-                    if (hasLockedEx) totalTrainings++;
-                    
-                    if (day.pushups?.count && day.pushups.isLocked) {
-                        maxPushups = Math.max(maxPushups, day.pushups.count);
-                    }
-                    if (day.run?.km && day.run.isLocked) {
-                        totalKm += parseFloat(day.run.km);
-                    }
-                });
+            const renderPlan = () => (
+                <div className="p-4 text-center text-slate-500">
+                    <h2 className="text-xl font-black text-slate-800 mb-4">План</h2>
+                    <p>Тут рекомендации...</p>
+                </div>
+            );
 
-                return { maxPushups, totalKm, totalTrainings };
-            }, [dailyData]);
-
-            const handleInput = (name, val) => {
-                const newInputs = { ...inputs, [name]: val };
-                setInputs(newInputs);
-                if (userId) AppStorage.setItem(`gto_${userId}_${gender}`, JSON.stringify(newInputs));
-            };
-
-            const handleClear = async () => {
-                triggerHaptic('impact', 'medium');
-                if (window.confirm('Точно очистить все введенные результаты ГТО?')) {
-                    setInputs({});
-                    if (userId) await AppStorage.removeItem(`gto_${userId}_${gender}`);
-                }
-            };
-
-            const handleClearTraining = async () => {
-                triggerHaptic('impact', 'heavy');
-                if (window.confirm('Точно удалить всю историю тренировок и стрики? Это действие нельзя отменить.')) {
-                    setDailyData({});
-                    if (userId) await AppStorage.removeItem(`gto_daily_${userId}`);
-                    showToast('История тренировок очищена 🗑️');
-                }
-            };
-
-            const lockTodayTraining = () => {
-                const todayData = dailyData[todayStr] || {};
-                let hasNew = false;
-                const newDaily = { ...dailyData };
-
-                if (!newDaily[todayStr]) newDaily[todayStr] = {};
-
-                ['run', 'pushups', 'flex', 'sprint'].forEach(ex => {
-                    const exData = todayData[ex] || {};
-                    if (!exData.isLocked) {
-                        const hasValues = Object.keys(exData).some(k => k !== 'isLocked' && exData[k] !== '' && exData[k] !== 0);
-                        if (hasValues) {
-                            newDaily[todayStr][ex] = { ...exData, isLocked: true };
-                            hasNew = true;
-                        }
-                    }
-                });
-
-                if (!hasNew) {
-                    showToast('Сначала введи новые результаты! 📝', true);
-                    return;
-                }
-
-                setDailyData(newDaily);
-                if (userId) AppStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
-                
-                triggerHaptic('notification', 'success'); 
-                showToast('Новые результаты зафиксированы! 🎉');
-            };
-
-            const handleDailyInput = (exercise, field, val) => {
-                if (dailyData[todayStr]?.[exercise]?.isLocked) return;
-                const newDaily = { ...dailyData };
-                if (!newDaily[todayStr]) newDaily[todayStr] = {};
-                if (!newDaily[todayStr][exercise]) newDaily[todayStr][exercise] = {};
-                newDaily[todayStr][exercise][field] = val;
-                
-                if (val === '' || val === 0) {
-                    delete newDaily[todayStr][exercise][field];
-                    if (Object.keys(newDaily[todayStr][exercise]).length === 0) delete newDaily[todayStr][exercise];
-                    if (Object.keys(newDaily[todayStr]).length === 0) delete newDaily[todayStr];
-                }
-
-                setDailyData(newDaily);
-                if (userId) AppStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
-            };
-
-            const updatePushups = (delta) => {
-                if (dailyData[todayStr]?.pushups?.isLocked) return;
-                triggerHaptic('impact', 'light'); 
-                const current = dailyData[todayStr]?.pushups?.count || 0;
-                const next = Math.max(0, current + delta);
-                if (next > 200 && delta > 0) {
-                    showToast('Киборг, помноженный на вечность? Вводи реальные цифры! 🤖', true);
-                    return;
-                }
-                handleDailyInput('pushups', 'count', next);
-            };
-
-            const validateSprint = () => {
-                if (dailyData[todayStr]?.sprint?.isLocked) return;
-                const val = parseFloat(dailyData[todayStr]?.sprint?.sec);
-                if (val > 0 && val < 6.0) {
-                    showToast('Полегче, Усейн Болт! Мировой рекорд 6.39с ⚡', true);
-                    handleDailyInput('sprint', 'sec', '');
-                }
-            };
-
-            const validateRun = () => {
-                if (dailyData[todayStr]?.run?.isLocked) return;
-                const km = parseFloat(dailyData[todayStr]?.run?.km);
-                const timeStr = dailyData[todayStr]?.run?.time;
-                if (km > 0 && timeStr) {
-                    const timeSec = parseTime(timeStr, 'мин:с');
-                    if (timeSec > 0) {
-                        const speed = km / (timeSec / 3600); 
-                        if (speed > 25) {
-                            showToast('Эй, Флэш! С такой скоростью можно добежать до Вологды за пару часов 🏍️', true);
-                            handleDailyInput('run', 'time', ''); 
-                        }
-                    }
-                }
-            };
-
-            const toggleCategory = (cat) => {
-                triggerHaptic('selection');
-                setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
-            };
-
-            // --- ОТРИСОВКА ЭКРАНОВ ---
-            const renderTraining = () => {
-                const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
-                const last7Days = Array.from({length: 7}, (_, i) => {
-                    const d = new Date();
-                    d.setDate(d.getDate() - (6 - i));
-                    return getDateString(d);
-                });
-
-                const todayRun = dailyData[todayStr]?.run || {};
-                const todayPushups = dailyData[todayStr]?.pushups || {};
-                const todayFlex = dailyData[todayStr]?.flex || {};
-                const todaySprint = dailyData[todayStr]?.sprint || {};
-
-                const todayData = dailyData[todayStr] || {};
-                const hasUnlockedData = Object.keys(todayData).some(ex => {
-                    const exData = todayData[ex];
-                    return !exData.isLocked && Object.keys(exData).some(k => k !== 'isLocked' && exData[k] !== '' && exData[k] !== 0);
-                });
-
-                return (
-                    <div className="px-4 space-y-6 pt-6 pb-6 mb-6">
-                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-50">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Серия побед</h3>
-                                <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1 rounded-full">
-                                    <span className="text-orange-500 text-lg">🔥</span>
-                                    <span className="font-bold text-orange-600">{currentStreak} дней</span>
-                                </div>
-                            </div>
-                            <div className="flex justify-between items-end gap-1">
-                                {last7Days.map((dStr, idx) => {
-                                    const isLocked = isDayLocked(dStr);
-                                    const isToday = idx === 6;
-                                    return (
-                                        <div key={dStr} className="flex flex-col items-center gap-1.5">
-                                            <div className={`w-8 rounded-xl transition-all duration-300 ${isLocked ? 'bg-gradient-to-t from-blue-600 to-blue-400 shadow-sm shadow-blue-500/20' : 'bg-slate-100'} ${isToday ? 'h-12' : 'h-8'}`}></div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-
-                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 pt-2">Ежедневный трекинг</h2>
-                        
-                        {/* Карточки упражнений (упрощено для краткости, логика та же) */}
-                        <div className="bg-white p-5 rounded-3xl shadow-sm">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">🏃‍♂️</div>
-                                <div><h3 className="font-bold text-slate-800">Бег</h3></div>
-                            </div>
-                            <div className="flex gap-3">
-                                <input type="text" placeholder="КМ" value={todayRun.km || ''} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} disabled={todayRun.isLocked} className="w-full bg-slate-50 p-3 rounded-xl text-right font-mono text-blue-600" />
-                                <input type="text" placeholder="МИН:С" value={todayRun.time || ''} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} disabled={todayRun.isLocked} className="w-full bg-slate-50 p-3 rounded-xl text-right font-mono text-blue-600" />
-                            </div>
-                        </div>
-
-                        {/* Остальные карточки аналогично... */}
-
-                        {hasUnlockedData && (
-                            <button onClick={lockTodayTraining} className="w-full bg-blue-600 text-white font-black p-5 rounded-3xl">ЗАПИСАТЬ ТРЕНИРОВКУ</button>
-                        )}
-                        
-                        <div className="mt-8 text-center">
-                            <button onClick={handleClearTraining} className="text-[10px] font-bold text-slate-300 hover:text-red-400 uppercase tracking-widest p-2">Сбросить историю</button>
-                        </div>
-                    </div>
-                );
-            };
-
-            const renderCalculator = () => {
-                // Здесь будет радар и таблица ГТО
-                return <div className="p-6">...Блок калькулятора и радар...</div>;
-            };
-
-            const renderProfile = () => {
-                const achievements = [
-                    { id: 'first', icon: '🥉', title: 'Первый шаг', desc: '1 сохраненная тренировка', isUnlocked: userStats.totalTrainings >= 1 },
-                    { id: 'streak', icon: '🔥', title: 'Дисциплина', desc: 'Стрик 7 дней', isUnlocked: currentStreak >= 7 },
-                    { id: 'machine', icon: '🤖', title: 'Машина', desc: '100+ отжиманий за раз', isUnlocked: userStats.maxPushups >= 100 },
-                    { id: 'marathon', icon: '🏃‍♂️', title: 'Марафонец', desc: 'Пробежать 42.2 км', isUnlocked: userStats.totalKm >= 42.2 }
-                ];
-                return (
-                    <div className="p-6 space-y-6">
-                        {/* Достижения из старого Анализа переехали сюда */}
-                        <div className="grid grid-cols-2 gap-3">
-                            {achievements.map(ach => (
-                                <div key={ach.id} className={`p-3 rounded-2xl border ${ach.isUnlocked ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100 opacity-60 grayscale'}`}>
-                                    <div className="text-xl mb-1">{ach.icon}</div>
-                                    <p className="text-sm font-bold">{ach.title}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            };
-
-            const renderPlan = () => <div className="p-6">...План...</div>;
-
-            // ... Остальная логика рендеринга с новой панелью ...
             return (
                 <div className="min-h-screen">
-                     {/* ... (шапка и контент) ... */}
-                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe z-50">
-                        <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
-                            <button onClick={() => switchView('training')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'training' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <span className="text-[10px] font-bold">Тренировка</span>
+                    <div className="bg-blue-600 p-6 text-white rounded-b-3xl shadow-md mb-6">
+                        <h1 className="text-2xl font-black tracking-widest">ТРЕКЕР</h1>
+                    </div>
+                    
+                    {view === 'training' && renderTraining()}
+                    {view === 'calculator' && renderCalculator()}
+                    {view === 'profile' && renderProfile()}
+                    {view === 'plan' && renderPlan()}
+
+                    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-50">
+                        {['training', 'calculator', 'profile', 'plan'].map((v) => (
+                            <button key={v} onClick={() => switchView(v)} className={`text-xs font-bold uppercase p-2 ${view === v ? 'text-blue-600' : 'text-slate-400'}`}>
+                                {v}
                             </button>
-                            <button onClick={() => switchView('calculator')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <span className="text-[10px] font-bold">Калькулятор</span>
-                            </button>
-                            <button onClick={() => switchView('profile')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'profile' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <span className="text-[10px] font-bold">Профиль</span>
-                            </button>
-                            <button onClick={() => switchView('plan')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <span className="text-[10px] font-bold">План</span>
-                            </button>
-                        </div>
+                        ))}
                     </div>
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
