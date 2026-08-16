@@ -31,8 +31,8 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // База нормативов ГТО
         const gtoData = [
-            // МУЖЧИНЫ 10 СТУПЕНЬ - ОБЯЗАТЕЛЬНЫЕ
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 8.8, silver: 10.9, bronze: 12.3 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 3000 м', unit: 'мин:с', gold: '13:00', silver: '14:30', bronze: '15:30' },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Выносливость', name: 'Кросс на 5 км', unit: 'мин:с', gold: '22:30', silver: '26:00', bronze: '28:30' },
@@ -43,8 +43,6 @@
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Сгибание рук в упоре лежа', unit: 'раз', gold: 33, silver: 19, bronze: 15 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Рывок гири 16 кг', unit: 'раз', gold: 40, silver: 22, bronze: 18 },
             { stage: 10, gender: 'М', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 23, silver: 15, bronze: 10 },
-
-            // МУЖЧИНЫ 10 СТУПЕНЬ - ПО ВЫБОРУ
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Прыжок в длину с места', unit: 'см', gold: 234, silver: 213, bronze: 197 },
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Скоростно-силовые возможности', name: 'Поднимание туловища за 1 мин', unit: 'раз', gold: 42, silver: 32, bronze: 25 },
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Метание спортивного снаряда 700 г', unit: 'м', gold: 35, silver: 30, bronze: 26 },
@@ -52,8 +50,6 @@
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (открытый прицел)', unit: 'очки', gold: 25, silver: 20, bronze: 15 },
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Стрельба (электронное оружие)', unit: 'очки', gold: 30, silver: 25, bronze: 18 },
             { stage: 10, gender: 'М', type: 'По выбору', category: 'Прикладные навыки', name: 'Туристский поход', unit: 'навыков', gold: 7, silver: 5, bronze: 3 },
-
-            // ЖЕНЩИНЫ 9 СТУПЕНЬ
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 60 м', unit: 'с', gold: 9.8, silver: 10.5, bronze: 11.4 },
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Скоростные возможности', name: 'Бег на 100 м', unit: 'с', gold: 16.7, silver: 17.9, bronze: 19.1 },
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Выносливость', name: 'Бег на 1000 м', unit: 'мин:с', gold: '4:20', silver: '4:40', bronze: '5:10' },
@@ -65,11 +61,7 @@
             { stage: 9, gender: 'Ж', type: 'Обязательное', category: 'Сила', name: 'Подтягивание на низкой перекладине 90 см', unit: 'раз', gold: 18, silver: 12, bronze: 8 }
         ];
 
-        const gtoQuotaData = {
-          'М_10': { 'gold': 6, 'silver': 5, 'bronze': 5 },
-          'Ж_9': { 'gold': 6, 'silver': 5, 'bronze': 5 }
-        };
-
+        const gtoQuotaData = { 'М_10': { 'gold': 6, 'silver': 5, 'bronze': 5 }, 'Ж_9': { 'gold': 6, 'silver': 5, 'bronze': 5 } };
         const badgeValues = { 'gold': 3, 'silver': 2, 'bronze': 1, 'none': 0 };
 
         const getPlural = (num) => {
@@ -82,17 +74,12 @@
             if (!val) return null;
             if (typeof val === 'number') return val;
             val = val.toString().replace(',', '.');
-            
             if (val.includes(':')) {
                 const parts = val.split(':');
                 return parseInt(parts[0] || 0) * 60 + parseFloat(parts[1] || 0);
             }
-            
             const floatVal = parseFloat(val);
-            if (unit === 'мин:с') {
-                return floatVal * 60;
-            }
-            return floatVal;
+            return unit === 'мин:с' ? floatVal * 60 : floatVal;
         };
 
         const formatGap = (gap, unit) => {
@@ -110,14 +97,12 @@
             const g = parseTime(discipline.gold, discipline.unit);
             if (!val || !g) return 0;
             const isTime = discipline.unit === 'с' || discipline.unit === 'мин:с';
-            
             let pct = isTime ? (g / val) * 100 : (val / g) * 100;
             return Math.min(pct, 150); 
         };
 
         const calculateResult = (discipline, inputValue) => {
             if (!inputValue) return null;
-            
             const val = parseTime(inputValue, discipline.unit);
             const g = parseTime(discipline.gold, discipline.unit);
             const s = parseTime(discipline.silver, discipline.unit);
@@ -137,14 +122,24 @@
             }
         };
 
+        // Хелпер для получения дат
+        const getDateString = (date) => {
+            const d = new Date(date);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().split('T')[0];
+        };
+
         const App = () => {
-            const [view, setView] = useState('calculator');
+            const [view, setView] = useState('training'); // Стартовый экран теперь Тренировка
             const [gender, setGender] = useState('М');
             const [inputs, setInputs] = useState({});
+            const [dailyData, setDailyData] = useState({}); // Хранилище ежедневных тренировок
             const [userName, setUserName] = useState('Атлет');
             const [userId, setUserId] = useState(null);
             const [userPhoto, setUserPhoto] = useState(null);
             const [expandedCategories, setExpandedCategories] = useState({});
+
+            const todayStr = getDateString(new Date());
 
             useEffect(() => {
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -154,9 +149,7 @@
                     if (tgUser) {
                         setUserName(tgUser.first_name);
                         setUserId(tgUser.id.toString());
-                        if (tgUser.photo_url) {
-                            setUserPhoto(tgUser.photo_url);
-                        }
+                        if (tgUser.photo_url) setUserPhoto(tgUser.photo_url);
                     } else {
                         setUserId('guest');
                     }
@@ -165,43 +158,74 @@
                 }
             }, []);
 
+            // Загрузка данных ГТО и Тренировок
             useEffect(() => {
                 if (!userId) return;
-                const saved = localStorage.getItem(`gto_${userId}_${gender}`);
-                if (saved) {
-                    try { setInputs(JSON.parse(saved)); } catch (e) {}
+                
+                // Данные калькулятора
+                const savedGto = localStorage.getItem(`gto_${userId}_${gender}`);
+                if (savedGto) {
+                    try { setInputs(JSON.parse(savedGto)); } catch (e) {}
                 } else {
                     setInputs({});
                 }
+                
+                // Данные тренировок
+                const savedDaily = localStorage.getItem(`gto_daily_${userId}`);
+                if (savedDaily) {
+                    try { setDailyData(JSON.parse(savedDaily)); } catch (e) {}
+                } else {
+                    setDailyData({});
+                }
+                
                 setExpandedCategories({});
             }, [userId, gender]);
 
             const handleInput = (name, val) => {
                 const newInputs = { ...inputs, [name]: val };
                 setInputs(newInputs);
-                if (userId) {
-                    localStorage.setItem(`gto_${userId}_${gender}`, JSON.stringify(newInputs));
-                }
+                if (userId) localStorage.setItem(`gto_${userId}_${gender}`, JSON.stringify(newInputs));
             };
 
             const handleClear = () => {
-                if (window.confirm('Точно очистить все введенные результаты?')) {
+                if (window.confirm('Точно очистить все введенные результаты ГТО?')) {
                     setInputs({});
-                    if (userId) {
-                        localStorage.removeItem(`gto_${userId}_${gender}`);
-                    }
+                    if (userId) localStorage.removeItem(`gto_${userId}_${gender}`);
                 }
             };
 
-            const toggleCategory = (cat) => {
-                setExpandedCategories(prev => ({
-                    ...prev,
-                    [cat]: !prev[cat]
-                }));
+            // Обновление ежедневных тренировок
+            const handleDailyInput = (exercise, field, val) => {
+                const newDaily = { ...dailyData };
+                if (!newDaily[todayStr]) newDaily[todayStr] = {};
+                if (!newDaily[todayStr][exercise]) newDaily[todayStr][exercise] = {};
+                
+                newDaily[todayStr][exercise][field] = val;
+                
+                // Очистка пустых объектов
+                if (val === '' || val === 0) {
+                    delete newDaily[todayStr][exercise][field];
+                    if (Object.keys(newDaily[todayStr][exercise]).length === 0) delete newDaily[todayStr][exercise];
+                    if (Object.keys(newDaily[todayStr]).length === 0) delete newDaily[todayStr];
+                }
+
+                setDailyData(newDaily);
+                if (userId) localStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
             };
 
+            // Быстрый счетчик отжиманий
+            const updatePushups = (delta) => {
+                const current = dailyData[todayStr]?.pushups?.count || 0;
+                const next = Math.max(0, current + delta);
+                handleDailyInput('pushups', 'count', next);
+            };
+
+            const toggleCategory = (cat) => {
+                setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+            };
+
+            // Вычисления для ГТО
             const currentData = useMemo(() => gtoData.filter(d => d.gender === gender), [gender]);
-            
             const results = useMemo(() => {
                 return currentData.map(d => {
                     const res = calculateResult(d, inputs[d.name]);
@@ -229,7 +253,6 @@
 
             const radarData = useMemo(() => {
                 const scores = { 'Скорость': [], 'Выносливость': [], 'Сила': [], 'Гибкость': [], 'Навыки': [] };
-                
                 bestResultsByCategory.forEach(r => {
                     const pct = calculatePercentage(r, inputs[r.name]);
                     if (r.category === 'Скоростные возможности') scores['Скорость'].push(pct);
@@ -237,15 +260,12 @@
                     if (r.category === 'Сила') scores['Сила'].push(pct);
                     if (r.category === 'Гибкость') scores['Гибкость'].push(pct);
                     if (r.category === 'Прикладные навыки') scores['Навыки'].push(pct);
-                    
                     if (r.category === 'Скоростно-силовые возможности') {
                         scores['Скорость'].push(pct);
                         scores['Сила'].push(pct);
                     }
                 });
-
                 const getAvg = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
-
                 return [
                     { subject: 'Скорость', val: getAvg(scores['Скорость']) },
                     { subject: 'Выносливость', val: getAvg(scores['Выносливость']) },
@@ -255,16 +275,150 @@
                 ];
             }, [bestResultsByCategory, inputs]);
 
+            // --- НОВЫЙ ЭКРАН: ТРЕНИРОВКА ---
+            const renderTraining = () => {
+                // Вычисление Стрика
+                let currentStreak = 0;
+                let checkDate = new Date();
+                
+                // Если сегодня пусто, проверяем, не сгорел ли стрик вчера
+                if (!dailyData[getDateString(checkDate)]) {
+                    checkDate.setDate(checkDate.getDate() - 1);
+                }
+
+                while (true) {
+                    const dStr = getDateString(checkDate);
+                    if (dailyData[dStr] && Object.keys(dailyData[dStr]).length > 0) {
+                        currentStreak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else {
+                        break;
+                    }
+                }
+
+                // Массив последних 7 дней для Heatmap
+                const last7Days = Array.from({length: 7}, (_, i) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - (6 - i));
+                    return getDateString(d);
+                });
+
+                const todayRunDist = dailyData[todayStr]?.run?.km || '';
+                const todayRunTime = dailyData[todayStr]?.run?.time || '';
+                const todayPushups = dailyData[todayStr]?.pushups?.count || 0;
+                const todayFlex = dailyData[todayStr]?.flex?.cm || '';
+                const todaySprint = dailyData[todayStr]?.sprint?.sec || '';
+
+                return (
+                    <div className="px-4 space-y-6 pt-6">
+                        
+                        {/* Heatmap & Стрик */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-50">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Активность</h3>
+                                <div className="flex items-center gap-1.5 bg-orange-50 px-3 py-1 rounded-full">
+                                    <span className="text-orange-500 text-lg">🔥</span>
+                                    <span className="font-bold text-orange-600">{currentStreak} дней</span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-end gap-1">
+                                {last7Days.map((dStr, idx) => {
+                                    const isActive = dailyData[dStr] && Object.keys(dailyData[dStr]).length > 0;
+                                    const isToday = idx === 6;
+                                    return (
+                                        <div key={dStr} className="flex flex-col items-center gap-1.5">
+                                            <div className={`w-8 rounded-xl transition-all duration-300 ${isActive ? 'bg-gradient-to-t from-blue-600 to-blue-400 shadow-sm shadow-blue-500/20' : 'bg-slate-100'} ${isToday ? 'h-12' : 'h-8'}`}></div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 pt-2">Ежедневный трекинг</h2>
+
+                        {/* Карточка 1: БЕГ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">🏃‍♂️</div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800">А ты сегодня бегал?</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Выносливость</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <div className="w-1/2 relative">
+                                    <input type="text" inputMode="decimal" placeholder="0" value={todayRunDist} onChange={(e) => handleDailyInput('run', 'km', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-10 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">КМ</span>
+                                </div>
+                                <div className="w-1/2 relative">
+                                    <input type="text" inputMode="decimal" placeholder="00:00" value={todayRunTime} onChange={(e) => handleDailyInput('run', 'time', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-3 pr-14 pl-3 focus:outline-none focus:ring-2 focus:ring-emerald-200" />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">МИН:С</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Карточка 2: ОТЖИМАНИЯ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl">💪</div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800">Отжимания</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Сила (за подход или день)</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between px-4">
+                                <button onClick={() => updatePushups(-1)} className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-3xl font-light active:scale-95 transition-transform">-</button>
+                                <span className="text-5xl font-black text-slate-800 tracking-tighter w-20 text-center">{todayPushups}</span>
+                                <button onClick={() => updatePushups(+1)} className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-light shadow-lg shadow-blue-600/30 active:scale-95 transition-transform">+</button>
+                            </div>
+                        </div>
+
+                        {/* Карточка 3: ГИБКОСТЬ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center text-xl">🧘‍♂️</div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800">Наклон вперед</h3>
+                                        <p className="text-xs text-slate-400 font-medium">Гибкость</p>
+                                    </div>
+                                </div>
+                                <div className="w-24 relative">
+                                    <input type="text" inputMode="decimal" placeholder="0" value={todayFlex} onChange={(e) => handleDailyInput('flex', 'cm', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-8 pl-2 focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">СМ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Карточка 4: СПРИНТ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm mb-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl">⚡️</div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800">Спринт 60м</h3>
+                                        <p className="text-xs text-slate-400 font-medium">Взрывная скорость</p>
+                                    </div>
+                                </div>
+                                <div className="w-24 relative">
+                                    <input type="text" inputMode="decimal" placeholder="0.0" value={todaySprint} onChange={(e) => handleDailyInput('sprint', 'sec', e.target.value)} className="w-full bg-slate-50 text-right text-lg font-mono font-semibold text-blue-600 rounded-xl py-2 pr-6 pl-2 focus:outline-none focus:ring-2 focus:ring-amber-200" />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">С</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                );
+            };
+
             const renderCalculator = () => {
                 const types = ['Обязательное', 'По выбору'];
 
                 return (
-                    // Увеличен верхний отступ (pt-10) для отделения заголовка от синего фона
                     <div className="px-4 space-y-8 pt-10"> 
                         {types.map(type => {
                             const typeData = currentData.filter(d => d.type === type);
                             if (typeData.length === 0) return null;
-                            
                             const categories = [...new Set(typeData.map(d => d.category))];
                             
                             return (
@@ -281,7 +435,6 @@
 
                                         return (
                                             <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm transition-all duration-200">
-                                                
                                                 <div 
                                                     className={`flex items-center justify-between ${isMulti ? 'cursor-pointer select-none' : ''} ${isExpanded && isMulti ? 'mb-4' : ''}`}
                                                     onClick={() => isMulti && toggleCategory(cat)}
@@ -297,7 +450,6 @@
                                                             <p className="text-xs text-slate-400 font-medium mt-0.5">({catDisciplines.length} {getPlural(catDisciplines.length)})</p>
                                                         )}
                                                     </div>
-
                                                     {isMulti && (
                                                         <div className="text-slate-400">
                                                             {isExpanded ? (
@@ -340,17 +492,11 @@
                             );
                         })}
                         
-                        <div className="flex gap-3 pt-4">
-                            <button 
-                                onClick={() => setView('dashboard')}
-                                className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform"
-                            >
+                        <div className="flex gap-3 pt-4 mb-6">
+                            <button onClick={() => setView('dashboard')} className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform">
                                 РАССЧИТАТЬ
                             </button>
-                            <button 
-                                onClick={handleClear}
-                                className="w-1/3 bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center"
-                            >
+                            <button onClick={handleClear} className="w-1/3 bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center">
                                 ОЧИСТИТЬ
                             </button>
                         </div>
@@ -366,13 +512,7 @@
                 const points = radarData.map((d, i) => {
                     const angle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
                     const r = (d.val / 100) * maxRadius;
-                    return {
-                        x: center + r * Math.cos(angle),
-                        y: center + r * Math.sin(angle),
-                        labelX: center + (maxRadius + 30) * Math.cos(angle),
-                        labelY: center + (maxRadius + 22) * Math.sin(angle),
-                        label: d.subject
-                    };
+                    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle), labelX: center + (maxRadius + 30) * Math.cos(angle), labelY: center + (maxRadius + 22) * Math.sin(angle), label: d.subject };
                 });
 
                 const userPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ') + ' Z';
@@ -392,36 +532,23 @@
                             <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                             Профиль атлета
                         </h3>
-                        
                         <div className="relative w-full max-w-[320px] aspect-square">
                             <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible drop-shadow-sm">
                                 {renderPolygon(50)}
                                 {renderPolygon(150)}
-                                
                                 {[0,1,2,3,4].map(i => {
                                     const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
                                     return <line key={i} x1={center} y1={center} x2={center + 1.5 * maxRadius * Math.cos(a)} y2={center + 1.5 * maxRadius * Math.sin(a)} stroke="#f1f5f9" strokeWidth="1" />;
                                 })}
-                                
                                 <path d={`M ${[0,1,2,3,4].map(i => {
                                     const a = -Math.PI / 2 + (2 * Math.PI * i) / 5;
                                     return `${center + maxRadius * Math.cos(a)},${center + maxRadius * Math.sin(a)}`;
                                 }).join(' L ')} Z`} fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" opacity="0.4"/>
-                                
                                 <path d={userPath} fill="rgba(37, 99, 235, 0.15)" stroke="#2563eb" strokeWidth="3" strokeLinejoin="round" />
-                                
-                                {points.map((p, i) => (
-                                    <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke="#2563eb" strokeWidth="2" />
-                                ))}
-                                
-                                {points.map((p, i) => (
-                                    <text key={i} x={p.labelX} y={p.labelY} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-widest">
-                                        {p.label}
-                                    </text>
-                                ))}
+                                {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke="#2563eb" strokeWidth="2" />)}
+                                {points.map((p, i) => <text key={i} x={p.labelX} y={p.labelY} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 uppercase tracking-widest">{p.label}</text>)}
                             </svg>
                         </div>
-                        
                         <div className="flex justify-center items-center gap-5 mt-4">
                             <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-slate-400 bg-slate-50"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Золото (100%)</span></div>
                             <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-600/20 border-2 border-blue-600"></div><span className="text-[10px] text-slate-500 font-bold uppercase">Твой результат</span></div>
@@ -434,8 +561,8 @@
                 if (results.length === 0) {
                     return (
                         <div className="px-4 text-center mt-10">
-                            <p className="text-slate-500 mb-4">Вы еще не ввели результаты.</p>
-                            <button onClick={() => setView('calculator')} className="text-blue-600 font-semibold border border-blue-600 px-6 py-2 rounded-full">Вернуться к вводу</button>
+                            <p className="text-slate-500 mb-4">Вы еще не ввели результаты для ГТО.</p>
+                            <button onClick={() => setView('calculator')} className="text-blue-600 font-semibold border border-blue-600 px-6 py-2 rounded-full">Перейти в Калькулятор</button>
                         </div>
                     );
                 }
@@ -469,8 +596,7 @@
                 const badgeNames = { 'gold': 'Золото', 'silver': 'Серебро', 'bronze': 'Бронза', 'none': 'Без знака' };
 
                 return (
-                    <div className="px-4 space-y-6 pt-6">
-                        
+                    <div className="px-4 space-y-6 pt-6 pb-6">
                         <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
                             <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
                             <p className="text-3xl font-black">{badgeNames[finalBadge]}</p>
@@ -509,7 +635,7 @@
                             <div className="bg-white p-5 rounded-3xl shadow-sm">
                                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                     <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                    Ближайшие цели (по вашим тестам)
+                                    Ближайшие цели
                                 </h3>
                                 <div className="space-y-4">
                                     {bestResultsByCategory.filter(r => r.result.badge !== 'gold').map(d => (
@@ -540,7 +666,7 @@
             const renderPlan = () => {
                 const executedDeficits = bestResultsByCategory.filter(r => r.result.badge !== 'gold');
                 if (executedDeficits.length === 0) {
-                    return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний! Тренировки идут по плану.</div>;
+                    return <div className="px-4 text-center text-slate-500 mt-10">У вас нет отставаний по ГТО! Тренировки идут по плану.</div>;
                 }
 
                 const weakCategories = [...new Set(executedDeficits.map(d => d.category))];
@@ -555,7 +681,7 @@
                 };
 
                 return (
-                    <div className="px-4 space-y-4 pt-6">
+                    <div className="px-4 space-y-4 pt-6 mb-6">
                         {weakCategories.map(cat => (
                             <div key={cat} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col">
                                 <div className="flex items-center justify-between mb-3">
@@ -576,23 +702,14 @@
                         <div className="relative z-10">
                             
                             <div className="flex items-center gap-3 mb-6">
-                                <img 
-                                    src="logo.png?v=2" 
-                                    alt="ГТО" 
-                                    className="h-10 w-auto object-contain drop-shadow-sm"
-                                />
+                                <img src="logo.png?v=2" alt="ГТО" className="h-10 w-auto object-contain drop-shadow-sm" />
                                 <h1 className="text-2xl font-black tracking-widest text-white drop-shadow-sm">ТРЕКЕР</h1>
                             </div>
                             
-                            {/* СГРУППИРОВАННАЯ КАРТОЧКА ПРОФИЛЯ */}
                             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex items-center justify-between shadow-sm">
                                 <div className="flex items-center gap-3">
                                     {userPhoto ? (
-                                        <img 
-                                            src={userPhoto} 
-                                            alt="Аватар" 
-                                            className="w-11 h-11 rounded-full border-2 border-white/30 object-cover shadow-sm" 
-                                        />
+                                        <img src={userPhoto} alt="Аватар" className="w-11 h-11 rounded-full border-2 border-white/30 object-cover shadow-sm" />
                                     ) : (
                                         <div className="w-11 h-11 rounded-full bg-blue-500/80 flex items-center justify-center text-white text-lg font-bold border-2 border-white/30 shadow-sm">
                                             {userName.charAt(0)}
@@ -604,34 +721,37 @@
                                     </p>
                                 </div>
                                 
-                                {view === 'calculator' && (
-                                    <div className="flex bg-blue-900/40 p-1 rounded-full w-32 shadow-inner border border-white/10">
-                                        <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Муж</button>
-                                        <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Жен</button>
-                                    </div>
-                                )}
+                                <div className="flex bg-blue-900/40 p-1 rounded-full w-32 shadow-inner border border-white/10">
+                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Муж</button>
+                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Жен</button>
+                                </div>
                             </div>
-                            
                         </div>
                     </div>
 
                     <div className="relative z-20 mt-4">
+                        {view === 'training' && renderTraining()}
                         {view === 'calculator' && renderCalculator()}
                         {view === 'dashboard' && renderDashboard()}
                         {view === 'plan' && renderPlan()}
                     </div>
 
+                    {/* ОБНОВЛЕННАЯ ПАНЕЛЬ НАВИГАЦИИ НА 4 КНОПКИ */}
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-50">
-                        <div className="flex justify-around items-center h-16 max-w-md mx-auto">
-                            <button onClick={() => setView('calculator')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
-                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                <span className="text-[10px] font-bold">Ввод</span>
+                        <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
+                            <button onClick={() => setView('training')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'training' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                <span className="text-[10px] font-bold">Тренировка</span>
                             </button>
-                            <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => setView('calculator')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                <span className="text-[10px] font-bold">Калькулятор</span>
+                            </button>
+                            <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                                 <span className="text-[10px] font-bold">Анализ</span>
                             </button>
-                            <button onClick={() => setView('plan')} className={`flex flex-col items-center justify-center w-1/3 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => setView('plan')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                                 <span className="text-[10px] font-bold">План</span>
                             </button>
