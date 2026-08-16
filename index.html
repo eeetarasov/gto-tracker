@@ -42,39 +42,26 @@
         const AppStorage = {
             async getItem(key) {
                 return new Promise((resolve) => {
-                    // 1. Пробуем получить из Telegram CloudStorage
                     if (window.Telegram?.WebApp?.CloudStorage) {
                         window.Telegram.WebApp.CloudStorage.getItem(key, (err, val) => {
                             if (!err && val) {
                                 resolve(val);
                             } else {
-                                resolve(localStorage.getItem(key)); // Фолбэк на локальное
+                                resolve(localStorage.getItem(key));
                             }
                         });
-                    } 
-                    // 2. Задел под мессенджер МАКС
-                    else if (window.MAX?.WebApp?.Storage) {
-                        // Логика МАКС будет здесь
-                        resolve(localStorage.getItem(key));
-                    } 
-                    // 3. Если ничего нет (браузер)
-                    else {
+                    } else {
                         resolve(localStorage.getItem(key));
                     }
                 });
             },
             async setItem(key, value) {
                 return new Promise((resolve) => {
-                    // Всегда пишем в локальный кэш для скорости
                     localStorage.setItem(key, value);
-
                     if (window.Telegram?.WebApp?.CloudStorage) {
                         window.Telegram.WebApp.CloudStorage.setItem(key, value, (err, success) => {
                             resolve(success);
                         });
-                    } else if (window.MAX?.WebApp?.Storage) {
-                        // Логика МАКС
-                        resolve(true);
                     } else {
                         resolve(true);
                     }
@@ -83,7 +70,6 @@
             async removeItem(key) {
                 return new Promise((resolve) => {
                     localStorage.removeItem(key);
-
                     if (window.Telegram?.WebApp?.CloudStorage) {
                         window.Telegram.WebApp.CloudStorage.removeItem(key, (err, success) => {
                             resolve(success);
@@ -92,6 +78,19 @@
                         resolve(true);
                     }
                 });
+            }
+        };
+
+        // --- HAPTIC FEEDBACK (ТАКТИЛЬНАЯ ОТДАЧА) ---
+        const triggerHaptic = (type = 'impact', style = 'light') => {
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                if (type === 'impact') {
+                    window.Telegram.WebApp.HapticFeedback.impactOccurred(style); // 'light', 'medium', 'heavy', 'rigid', 'soft'
+                } else if (type === 'notification') {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred(style); // 'success', 'warning', 'error'
+                } else if (type === 'selection') {
+                    window.Telegram.WebApp.HapticFeedback.selectionChanged();
+                }
             }
         };
 
@@ -200,16 +199,22 @@
             const [userId, setUserId] = useState(null);
             const [userPhoto, setUserPhoto] = useState(null);
             const [expandedCategories, setExpandedCategories] = useState({});
-            const [isLoaded, setIsLoaded] = useState(false); // Флаг загрузки из облака
+            const [isLoaded, setIsLoaded] = useState(false); 
             
             const [toast, setToast] = useState(null);
             const toastTimer = useRef(null);
 
             const todayStr = getDateString(new Date());
 
-            const showToast = (message) => {
+            const switchView = (newView) => {
+                triggerHaptic('selection');
+                setView(newView);
+            };
+
+            const showToast = (message, isError = false) => {
                 if (toastTimer.current) clearTimeout(toastTimer.current);
                 setToast(message);
+                if (isError) triggerHaptic('notification', 'error');
                 toastTimer.current = setTimeout(() => setToast(null), 4000);
             };
 
@@ -230,10 +235,8 @@
                 }
             }, []);
 
-            // АСИНХРОННАЯ ЗАГРУЗКА ИЗ УНИВЕРСАЛЬНОГО АДАПТЕРА
             useEffect(() => {
                 if (!userId) return;
-                
                 const loadAllData = async () => {
                     const savedGto = await AppStorage.getItem(`gto_${userId}_${gender}`);
                     if (savedGto) {
@@ -252,9 +255,51 @@
                     setIsLoaded(true);
                     setExpandedCategories({});
                 };
-
                 loadAllData();
             }, [userId, gender]);
+
+            // Вычисляем текущий стрик глобально, чтобы использовать в ачивках
+            const currentStreak = useMemo(() => {
+                let streak = 0;
+                let checkDate = new Date();
+                const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
+
+                if (!isDayLocked(getDateString(checkDate))) {
+                    checkDate.setDate(checkDate.getDate() - 1);
+                }
+
+                while (true) {
+                    const dStr = getDateString(checkDate);
+                    if (isDayLocked(dStr)) {
+                        streak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else {
+                        break;
+                    }
+                }
+                return streak;
+            }, [dailyData]);
+
+            // Вычисляем статистику для ачивок
+            const userStats = useMemo(() => {
+                let maxPushups = 0;
+                let totalKm = 0;
+                let totalTrainings = 0;
+
+                Object.values(dailyData).forEach(day => {
+                    const hasLockedEx = Object.values(day).some(ex => ex?.isLocked);
+                    if (hasLockedEx) totalTrainings++;
+                    
+                    if (day.pushups?.count && day.pushups.isLocked) {
+                        maxPushups = Math.max(maxPushups, day.pushups.count);
+                    }
+                    if (day.run?.km && day.run.isLocked) {
+                        totalKm += parseFloat(day.run.km);
+                    }
+                });
+
+                return { maxPushups, totalKm, totalTrainings };
+            }, [dailyData]);
 
             const handleInput = (name, val) => {
                 const newInputs = { ...inputs, [name]: val };
@@ -263,6 +308,7 @@
             };
 
             const handleClear = async () => {
+                triggerHaptic('impact', 'medium');
                 if (window.confirm('Точно очистить все введенные результаты ГТО?')) {
                     setInputs({});
                     if (userId) await AppStorage.removeItem(`gto_${userId}_${gender}`);
@@ -288,12 +334,14 @@
                 });
 
                 if (!hasNew) {
-                    showToast('Сначала введи новые результаты! 📝');
+                    showToast('Сначала введи новые результаты! 📝', true);
                     return;
                 }
 
                 setDailyData(newDaily);
                 if (userId) AppStorage.setItem(`gto_daily_${userId}`, JSON.stringify(newDaily));
+                
+                triggerHaptic('notification', 'success'); // Победная вибрация
                 showToast('Новые результаты зафиксированы! 🎉');
             };
 
@@ -301,11 +349,11 @@
                 if (dailyData[todayStr]?.[exercise]?.isLocked) return;
 
                 if (field === 'km' && parseFloat(val) > 50) {
-                    showToast('Ультрамарафон на тренировке? Оставим это киборгам! 🏃‍♂️');
+                    showToast('Ультрамарафон на тренировке? Оставим это киборгам! 🏃‍♂️', true);
                     return;
                 }
                 if (field === 'cm' && (parseFloat(val) > 40 || parseFloat(val) < -40)) {
-                    showToast('Твоей растяжке позавидует Человек-Паук! Но давай без магии. 🕷️');
+                    showToast('Твоей растяжке позавидует Человек-Паук! Но давай без магии. 🕷️', true);
                     return;
                 }
 
@@ -328,11 +376,13 @@
             const updatePushups = (delta) => {
                 if (dailyData[todayStr]?.pushups?.isLocked) return;
                 
+                triggerHaptic('impact', 'light'); // Легкая тактильная отдача при +/-
+                
                 const current = dailyData[todayStr]?.pushups?.count || 0;
                 const next = Math.max(0, current + delta);
                 
                 if (next > 200 && delta > 0) {
-                    showToast('Киборг, помноженный на вечность? Вводи реальные цифры! 🤖');
+                    showToast('Киборг, помноженный на вечность? Вводи реальные цифры! 🤖', true);
                     return;
                 }
                 
@@ -343,7 +393,7 @@
                 if (dailyData[todayStr]?.sprint?.isLocked) return;
                 const val = parseFloat(dailyData[todayStr]?.sprint?.sec);
                 if (val > 0 && val < 6.0) {
-                    showToast('Полегче, Усейн Болт! Мировой рекорд 6.39с ⚡');
+                    showToast('Полегче, Усейн Болт! Мировой рекорд 6.39с ⚡', true);
                     handleDailyInput('sprint', 'sec', '');
                 }
             };
@@ -357,7 +407,7 @@
                     if (timeSec > 0) {
                         const speed = km / (timeSec / 3600); 
                         if (speed > 25) {
-                            showToast('Эй, Флэш! С такой скоростью можно добежать до Вологды за пару часов 🏍️');
+                            showToast('Эй, Флэш! С такой скоростью можно добежать до Вологды за пару часов 🏍️', true);
                             handleDailyInput('run', 'time', ''); 
                         }
                     }
@@ -365,6 +415,7 @@
             };
 
             const toggleCategory = (cat) => {
+                triggerHaptic('selection');
                 setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
             };
 
@@ -419,25 +470,7 @@
             }, [bestResultsByCategory, inputs]);
 
             const renderTraining = () => {
-                let currentStreak = 0;
-                let checkDate = new Date();
-                
                 const isDayLocked = (dStr) => Object.values(dailyData[dStr] || {}).some(ex => ex?.isLocked);
-
-                if (!isDayLocked(getDateString(checkDate))) {
-                    checkDate.setDate(checkDate.getDate() - 1);
-                }
-
-                while (true) {
-                    const dStr = getDateString(checkDate);
-                    if (isDayLocked(dStr)) {
-                        currentStreak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else {
-                        break;
-                    }
-                }
-
                 const last7Days = Array.from({length: 7}, (_, i) => {
                     const d = new Date();
                     d.setDate(d.getDate() - (6 - i));
@@ -661,7 +694,7 @@
                         })}
                         
                         <div className="flex gap-3 pt-4 mb-6">
-                            <button onClick={() => setView('dashboard')} className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform">
+                            <button onClick={() => switchView('dashboard')} className="w-2/3 bg-blue-600 text-white font-bold text-lg py-4 rounded-3xl shadow-lg shadow-blue-600/30 active:scale-95 transition-transform">
                                 РАССЧИТАТЬ
                             </button>
                             <button onClick={handleClear} className="w-1/3 bg-slate-200 text-slate-600 font-bold text-sm py-4 rounded-3xl active:scale-95 transition-transform flex items-center justify-center">
@@ -697,7 +730,7 @@
                 return (
                     <div className="bg-white p-5 rounded-3xl shadow-sm flex flex-col items-center overflow-hidden">
                         <h3 className="text-lg font-bold text-slate-800 w-full mb-4 flex items-center">
-                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002-2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                             Профиль атлета
                         </h3>
                         <div className="relative w-full max-w-[320px] aspect-square">
@@ -726,11 +759,34 @@
             };
 
             const renderDashboard = () => {
+                const achievements = [
+                    { 
+                        id: 'first', icon: '🥉', title: 'Первый шаг', 
+                        desc: 'Сохранить 1 тренировку', 
+                        isUnlocked: userStats.totalTrainings >= 1 
+                    },
+                    { 
+                        id: 'streak', icon: '🔥', title: 'Дисциплина', 
+                        desc: 'Стрик 7 дней', 
+                        isUnlocked: currentStreak >= 7 
+                    },
+                    { 
+                        id: 'machine', icon: '🤖', title: 'Машина', 
+                        desc: '100+ отжиманий за раз', 
+                        isUnlocked: userStats.maxPushups >= 100 
+                    },
+                    { 
+                        id: 'marathon', icon: '🏃‍♂️', title: 'Марафонец', 
+                        desc: 'Суммарно пробежать 42.2 км', 
+                        isUnlocked: userStats.totalKm >= 42.2 
+                    }
+                ];
+
                 if (results.length === 0) {
                     return (
                         <div className="px-4 text-center mt-10">
                             <p className="text-slate-500 mb-4">Вы еще не ввели результаты для ГТО.</p>
-                            <button onClick={() => setView('calculator')} className="text-blue-600 font-semibold border border-blue-600 px-6 py-2 rounded-full">Перейти в Калькулятор</button>
+                            <button onClick={() => switchView('calculator')} className="text-blue-600 font-semibold border border-blue-600 px-6 py-2 rounded-full">Перейти в Калькулятор</button>
                         </div>
                     );
                 }
@@ -766,17 +822,39 @@
                 return (
                     <div className="px-4 space-y-6 pt-6 pb-6 mb-6">
                         <div className={`p-6 rounded-3xl shadow-sm text-center ${headerColors[finalBadge]} flex flex-col items-center justify-center`}>
-                            <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус</h2>
+                            <h2 className="text-xs uppercase tracking-wider font-bold opacity-70 mb-1">Ваш текущий статус ГТО</h2>
                             <p className="text-3xl font-black">{badgeNames[finalBadge]}</p>
                             {badgeByQuota === 'none' && <p className="text-xs mt-2 text-red-700">Минимумы по категориям не выполнены</p>}
                         </div>
 
                         {renderRadarChart()}
 
+                        {/* ВИТРИНА ДОСТИЖЕНИЙ */}
+                        <div className="bg-white p-5 rounded-3xl shadow-sm">
+                            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                <svg className="w-5 h-5 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                                Витрина достижений
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                {achievements.map(ach => (
+                                    <div key={ach.id} className={`p-3 rounded-2xl border flex flex-col items-start gap-2 transition-all duration-300 ${ach.isUnlocked ? 'bg-amber-50 border-amber-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60 grayscale'}`}>
+                                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white shadow-sm border border-slate-100 relative">
+                                            {ach.icon}
+                                            {!ach.isUnlocked && <div className="absolute -bottom-1 -right-1 text-[10px]">🔒</div>}
+                                        </div>
+                                        <div>
+                                            <p className={`text-sm font-bold leading-tight ${ach.isUnlocked ? 'text-amber-800' : 'text-slate-500'}`}>{ach.title}</p>
+                                            <p className="text-[10px] font-medium mt-0.5 text-slate-400 leading-tight">{ach.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="bg-white p-5 rounded-3xl shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                 <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                Выполнение минимумов
+                                Выполнение минимумов ГТО
                             </h3>
                             <div className="space-y-4 text-sm">
                                 <div className="flex justify-between items-center border-b border-slate-50 pb-3">
@@ -798,35 +876,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        {worstExecutedBadge !== 'gold' && (
-                            <div className="bg-white p-5 rounded-3xl shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                    <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                    Ближайшие цели
-                                </h3>
-                                <div className="space-y-4">
-                                    {bestResultsByCategory.filter(r => r.result.badge !== 'gold').map(d => (
-                                        <div key={d.name} className="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0 last:pb-0">
-                                            <p className="text-sm font-medium text-slate-700 w-1/2 pr-2 leading-tight">{d.name}</p>
-                                            <div className="text-right">
-                                                <p className={`text-[10px] uppercase font-bold tracking-wider ${{'gold': 'text-yellow-600', 'silver': 'text-slate-500', 'bronze': 'text-orange-600'}[d.result.nextBadge]}`}>
-                                                    Цель: {badgeNames[d.result.nextBadge]}
-                                                </p>
-                                                <p className="text-sm font-mono font-bold text-slate-900 whitespace-nowrap mt-0.5">
-                                                    осталось <span className="text-blue-600">{formatGap(d.result.gap, d.unit)}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {worstExecutedBadge === 'gold' && finalBadge === 'gold' && (
-                          <div className="bg-white p-6 rounded-3xl text-center shadow-sm">
-                              <p className="text-lg font-bold text-green-600">Все выполненные категории на Золото!</p>
-                          </div>
-                        )}
                     </div>
                 );
             };
@@ -863,7 +912,6 @@
                 );
             };
 
-            // Пока данные грузятся, показываем легкий скелетон
             if (!isLoaded) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -908,8 +956,8 @@
                                 </div>
                                 
                                 <div className="flex bg-blue-900/40 p-1 rounded-full w-32 shadow-inner border border-white/10">
-                                    <button onClick={() => setGender('М')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Муж</button>
-                                    <button onClick={() => setGender('Ж')} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Жен</button>
+                                    <button onClick={() => { triggerHaptic('selection'); setGender('М'); }} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'М' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Муж</button>
+                                    <button onClick={() => { triggerHaptic('selection'); setGender('Ж'); }} className={`flex-1 py-1.5 text-[11px] uppercase tracking-wider font-bold rounded-full transition-all ${gender === 'Ж' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}>Жен</button>
                                 </div>
                             </div>
                         </div>
@@ -924,19 +972,19 @@
 
                     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-50">
                         <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
-                            <button onClick={() => setView('training')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'training' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => switchView('training')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'training' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                                 <span className="text-[10px] font-bold">Тренировка</span>
                             </button>
-                            <button onClick={() => setView('calculator')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => switchView('calculator')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'calculator' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                                 <span className="text-[10px] font-bold">Калькулятор</span>
                             </button>
-                            <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => switchView('dashboard')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                                 <span className="text-[10px] font-bold">Анализ</span>
                             </button>
-                            <button onClick={() => setView('plan')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <button onClick={() => switchView('plan')} className={`flex flex-col items-center justify-center w-1/4 h-full ${view === 'plan' ? 'text-blue-600' : 'text-slate-400'}`}>
                                 <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                                 <span className="text-[10px] font-bold">План</span>
                             </button>
